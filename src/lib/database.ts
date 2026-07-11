@@ -87,6 +87,7 @@ async function initializeDatabase(database: SQLite.SQLiteDatabase): Promise<void
       amount REAL NOT NULL,
       date TEXT NOT NULL,
       description TEXT,
+      photo_uri TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
       FOREIGN KEY (category_id) REFERENCES expense_categories(id) ON DELETE CASCADE
@@ -248,7 +249,10 @@ export async function deleteExpenseCategory(id: number, userId: number): Promise
 
 // ==================== EXPENSES ====================
 // NEW: Updated to support date filtering
-export async function getExpenses(userId: number, filters?: { categoryId?: number; startDate?: string; endDate?: string }): Promise<any[]> {
+export async function getExpenses(
+  userId: number,
+  filters?: { categoryId?: number; startDate?: string; endDate?: string }
+): Promise<any[]> {
   const db = await getDatabase();
   let query = `
     SELECT e.*, c.name as category_name, c.color as category_color
@@ -257,7 +261,7 @@ export async function getExpenses(userId: number, filters?: { categoryId?: numbe
     WHERE e.user_id = ?
   `;
   const params: any[] = [userId];
-  
+
   if (filters?.categoryId) {
     query += ' AND e.category_id = ?';
     params.push(filters.categoryId);
@@ -270,26 +274,26 @@ export async function getExpenses(userId: number, filters?: { categoryId?: numbe
     query += ' AND e.date <= ?';
     params.push(filters.endDate);
   }
-  
+
   query += ' ORDER BY e.date DESC, e.id DESC';
   return await db.getAllAsync(query, params);
 }
 
-export async function createExpense(userId: number, categoryId: number, amount: number, date: string, description?: string): Promise<number> {
+export async function createExpense(userId: number, categoryId: number, amount: number, date: string, description?: string, photoUri?: string): Promise<number> {
   const db = await getDatabase();
   const result = await db.runAsync(
-    'INSERT INTO expenses (user_id, category_id, amount, date, description) VALUES (?, ?, ?, ?, ?)',
-    [userId, categoryId, amount, date, description || null]
+    'INSERT INTO expenses (user_id, category_id, amount, date, description, photo_uri) VALUES (?, ?, ?, ?, ?, ?)',
+    [userId, categoryId, amount, date, description || null, photoUri || null]
   );
   return result.lastInsertRowId;
 }
 
 // NEW: Update expense function
-export async function updateExpense(id: number, userId: number, categoryId: number, amount: number, date: string, description?: string): Promise<void> {
+export async function updateExpense(id: number, userId: number, categoryId: number, amount: number, date: string, description?: string, photoUri?: string): Promise<void> {
   const db = await getDatabase();
   await db.runAsync(
-    'UPDATE expenses SET category_id = ?, amount = ?, date = ?, description = ? WHERE id = ? AND user_id = ?',
-    [categoryId, amount, date, description || null, id, userId]
+    'UPDATE expenses SET category_id = ?, amount = ?, date = ?, description = ?, photo_uri = ? WHERE id = ? AND user_id = ?',
+    [categoryId, amount, date, description || null,  photoUri || null,  id, userId]
   );
 }
 
