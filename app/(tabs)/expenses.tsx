@@ -27,6 +27,8 @@ import { Input } from '../../src/components/Input';
 import { Select } from '../../src/components/Select';
 import DatePicker from '../../src/components/DatePicker';
 import DateRangeFilter from '../../src/components/DateRangeFilter';
+import { generateExpenseReport } from '../../src/lib/reportService';
+import { ActivityIndicator } from 'react-native';
 
 type Tab = 'expenses' | 'categories';
 
@@ -102,6 +104,8 @@ export default function Expenses() {
 
   const [filterCategory, setFilterCategory] = useState<number | string>('');
 
+  const [generatingReport, setGeneratingReport] = useState(false);
+
   /**
    * IMPORTANT:
    * We always load all expenses from SQLite.
@@ -129,6 +133,54 @@ export default function Expenses() {
       loadData();
     }, [user])
   );
+
+  // Add inside Expenses() component after loadData function
+const handleGenerateReport = async () => {
+  if (!user) return;
+
+  setGeneratingReport(true);
+  try {
+    // Build category totals from filtered expenses
+    const categoryMap: Record<number, {
+      id: number;
+      name: string;
+      color: string;
+      total: number;
+    }> = {};
+
+    filteredExpenses.forEach((e) => {
+      if (!categoryMap[e.category_id]) {
+        categoryMap[e.category_id] = {
+          id: e.category_id,
+          name: e.category_name,
+          color: e.category_color || '#6b7280',
+          total: 0,
+        };
+      }
+      categoryMap[e.category_id].total += Number(e.amount || 0);
+    });
+
+    await generateExpenseReport({
+      userName: user.name,
+      startDate,
+      endDate,
+      totalExpenses,
+      expenses: filteredExpenses.map((e) => ({
+        id: e.id,
+        date: e.date,
+        category_name: e.category_name,
+        category_color: e.category_color || '#6b7280',
+        amount: Number(e.amount || 0),
+        description: e.description,
+      })),
+      categories: Object.values(categoryMap),
+    });
+  } catch (error) {
+    Alert.alert('Report Failed', String(error));
+  } finally {
+    setGeneratingReport(false);
+  }
+};
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -392,6 +444,30 @@ export default function Expenses() {
               <Text style={styles.totalValue}>
                 {formatCurrency(totalExpenses)}
               </Text>
+
+              {/* Report Button */}
+              <TouchableOpacity
+                style={[
+                  styles.reportButton,
+                  generatingReport && { opacity: 0.6 },
+                ]}
+                onPress={handleGenerateReport}
+                disabled={generatingReport || filteredExpenses.length === 0}
+              >
+                {generatingReport ? (
+                  <View style={styles.reportButtonContent}>
+                    <ActivityIndicator size="small" color="#fff" />
+                    <Text style={styles.reportButtonText}>Generating PDF...</Text>
+                  </View>
+                ) : (
+                  <View style={styles.reportButtonContent}>
+                    <Text style={styles.reportButtonIcon}>📄</Text>
+                    <Text style={styles.reportButtonText}>
+                      Generate PDF Report
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
             </Card>
 
             {filteredExpenses.length === 0 ? (
@@ -802,4 +878,31 @@ const styles = StyleSheet.create({
     gap: 12,
     marginTop: 16,
   },
+
+  reportButton: {
+  marginTop: 14,
+  backgroundColor: '#3b82f6',
+  paddingVertical: 12,
+  paddingHorizontal: 20,
+  borderRadius: 10,
+  alignSelf: 'stretch',
+  },
+
+  reportButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+
+  reportButtonIcon: {
+    fontSize: 16,
+  },
+  
+  reportButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
 });
