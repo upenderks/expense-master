@@ -4,14 +4,26 @@ let db: SQLite.SQLiteDatabase | null = null;
 
 export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   if (!db) {
-    db = await SQLite.openDatabaseAsync('tracker_v2.db');
+    db = await SQLite.openDatabaseAsync('expense_tracker.db');
     await initializeDatabase(db);
   }
   return db;
 }
 
+// Call this after restore to reset the singleton
+export function resetDatabaseInstance(): void {
+  db = null;
+}
+
 async function initializeDatabase(database: SQLite.SQLiteDatabase): Promise<void> {
-  // Drop old tables (for development)
+  // Step 1: Disable FK checks temporarily for drops
+  await database.execAsync('PRAGMA foreign_keys = OFF;');
+
+  // Step 2: Drop in correct child-first order (only for dev/reset)
+  // ⚠️ IMPORTANT: Comment these DROP lines out in production
+  // or your data will be wiped every time app restarts
+
+  /*
   await database.execAsync(`
     DROP TABLE IF EXISTS expenses;
     DROP TABLE IF EXISTS money_transactions;
@@ -19,10 +31,13 @@ async function initializeDatabase(database: SQLite.SQLiteDatabase): Promise<void
     DROP TABLE IF EXISTS borrowers;
     DROP TABLE IF EXISTS users;
   `);
+    */
 
+  // Step 3: Enable FK checks
+  await database.execAsync('PRAGMA foreign_keys = ON;');
+
+  // Step 4: Create tables if not exist
   await database.execAsync(`
-    PRAGMA foreign_keys = ON;
-
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
