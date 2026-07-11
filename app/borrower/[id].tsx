@@ -21,6 +21,10 @@ import {
   deleteTransaction,
   updateBorrower,
   deleteBorrower,
+  settleBorrower,
+  getSettlements,
+  getSettlementTransactions,
+  deleteSettlement,
 } from '../../src/lib/database';
 import { Card } from '../../src/components/Card';
 import { Button } from '../../src/components/Button';
@@ -29,6 +33,8 @@ import DatePicker from '../../src/components/DatePicker';
 import DateRangeFilter from '../../src/components/DateRangeFilter';
 import { HorizontalBarChart } from '../../src/components/charts/HorizontalBarChart';
 
+type ViewTab = 'active' | 'settled';
+
 export default function BorrowerDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
@@ -36,8 +42,10 @@ export default function BorrowerDetail() {
 
   const [borrower, setBorrower] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [settlements, setSettlements] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [activeViewTab, setActiveViewTab] = useState<ViewTab>('active');
 
   // Date filter
   const [startDate, setStartDate] = useState('');
@@ -47,6 +55,14 @@ export default function BorrowerDetail() {
   const [transactionModal, setTransactionModal] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<any>(null);
   const [editBorrowerModal, setEditBorrowerModal] = useState(false);
+  const [settleModal, setSettleModal] = useState(false);
+  const [settleNotes, setSettleNotes] = useState('');
+  const [settleSaving, setSettleSaving] = useState(false);
+
+  // Settlement expansion
+  const [expandedSettlement, setExpandedSettlement] = useState<number | null>(null);
+  const [settlementTxs, setSettlementTxs] = useState<any[]>([]);
+  const [loadingSettlementTxs, setLoadingSettlementTxs] = useState(false);
 
   // Forms
   const [transactionForm, setTransactionForm] = useState({
@@ -81,6 +97,9 @@ export default function BorrowerDetail() {
 
       const txs = await getTransactions(user.id, filters);
       setTransactions(txs);
+
+      const setts = await getSettlements(user.id, borrowerId);
+      setSettlements(setts);
     } catch (error) {
       console.error('Load error:', error);
     } finally {
@@ -178,6 +197,76 @@ export default function BorrowerDetail() {
     ]);
   };
 
+  // ── Settlement handlers ────────────────────────────────────────────
+
+  const handleOpenSettle = () => {
+    setSettleNotes('');
+    setSettleModal(true);
+  };
+
+  const handleSettleBorrower = async () => {
+    setSettleSaving(true);
+    try {
+      await settleBorrower(user!.id, borrowerId, settleNotes);
+      setSettleModal(false);
+      Alert.alert(
+        '✅ Account Settled',
+        `All transactions with ${borrower?.name} have been settled. New transactions will start fresh.`
+      );
+      await loadData();
+    } catch (error) {
+      Alert.alert('Error', (error as Error).message);
+    } finally {
+      setSettleSaving(false);
+    }
+  };
+
+  const handleUndoSettlement = (settlementId: number) => {
+    Alert.alert(
+      'Undo Settlement',
+      'This will restore all transactions from this settlement back to active. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Undo',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteSettlement(settlementId, user!.id);
+              await loadData();
+              Alert.alert('✅ Settlement Undone', 'Transactions restored.');
+            } catch (error) {
+              Alert.alert('Error', (error as Error).message);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleToggleSettlement = async (settlement: any) => {
+    if (expandedSettlement === settlement.id) {
+      setExpandedSettlement(null);
+      setSettlementTxs([]);
+      return;
+    }
+    setExpandedSettlement(settlement.id);
+    setLoadingSettlementTxs(true);
+    try {
+      const txs = await getSettlementTransactions(
+        user!.id,
+        borrowerId,
+        settlement.settled_at
+      );
+      setSettlementTxs(txs);
+    } catch (error) {
+      console.error('Load settlement txs error:', error);
+      setSettlementTxs([]);
+    } finally {
+      setLoadingSettlementTxs(false);
+    }
+  };
+
   // ── Borrower handlers ──────────────────────────────────────────────
 
   const openEditBorrower = () => {
@@ -220,7 +309,7 @@ export default function BorrowerDetail() {
   const handleDeleteBorrower = () => {
     Alert.alert(
       'Delete Borrower',
-      `Delete ${borrower?.name}? This will also delete all their transactions.`,
+      `Delete ${borrower?.name}? This will remove all transactions and settlements.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -238,34 +327,49 @@ export default function BorrowerDetail() {
   // ── Quick actions ──────────────────────────────────────────────────
 
   const handleCall = () => {
-    if (borrower?.phone) {
-      Linking.openURL(`tel:${borrower.phone}`);
-    }
+    if (borrower?.phone) Linking.openURL(`tel:${borrower.phone}`);
   };
 
   const handleWhatsApp = () => {
     if (borrower?.phone) {
       const phone = borrower.phone.replace(/[^0-9]/g, '');
-      const message = `Hi ${borrower.name}`;
-      Linking.openURL(`whatsapp://send?phone=${phone}&text=${encodeURIComponent(message)}`);
+      Linking.openURL(
+        `whatsapp://send?phone=${phone}&text=${encodeURIComponent(
+          `Hi ${borrower.name}`
+        )}`
+      );
     }
   };
 
   const handleEmail = () => {
-    if (borrower?.email) {
-      Linking.openURL(`mailto:${borrower.email}`);
-    }
+    if (borrower?.email) Linking.openURL(`mailto:${borrower.email}`);
   };
 
   // ── Formatting ─────────────────────────────────────────────────────
 
   const formatCurrency = (amount: number) =>
-    '₹' + Number(amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+    '₹' +
+    Number(amount || 0).toLocaleString('en-IN', {
+      maximumFractionDigits: 0,
+    });
 
   const formatShort = (amount: number) => {
     if (amount >= 100000) return '₹' + (amount / 100000).toFixed(1) + 'L';
     if (amount >= 1000) return '₹' + (amount / 1000).toFixed(1) + 'K';
     return '₹' + amount.toFixed(0);
+  };
+
+  const formatDateTime = (dateStr: string) => {
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
+    } catch {
+      return dateStr;
+    }
   };
 
   // ── Computed values ────────────────────────────────────────────────
@@ -285,6 +389,8 @@ export default function BorrowerDetail() {
     { label: 'Received', value: totalReceived, color: '#059669' },
   ];
 
+  const canSettle = transactions.length > 0;
+
   // ── Loading / Not found ────────────────────────────────────────────
 
   if (loading) {
@@ -299,7 +405,11 @@ export default function BorrowerDetail() {
     return (
       <View style={styles.loadingContainer}>
         <Text style={styles.loadingText}>Borrower not found</Text>
-        <Button title="Go Back" onPress={() => router.back()} style={{ marginTop: 16 }} />
+        <Button
+          title="Go Back"
+          onPress={() => router.back()}
+          style={{ marginTop: 16 }}
+        />
       </View>
     );
   }
@@ -351,7 +461,10 @@ export default function BorrowerDetail() {
           {/* Quick Actions */}
           <View style={styles.quickActions}>
             {borrower.phone && (
-              <TouchableOpacity style={styles.quickActionBtn} onPress={handleCall}>
+              <TouchableOpacity
+                style={styles.quickActionBtn}
+                onPress={handleCall}
+              >
                 <Text style={styles.quickActionIcon}>📞</Text>
                 <Text style={styles.quickActionText}>Call</Text>
               </TouchableOpacity>
@@ -366,7 +479,10 @@ export default function BorrowerDetail() {
               </TouchableOpacity>
             )}
             {borrower.email && (
-              <TouchableOpacity style={styles.quickActionBtn} onPress={handleEmail}>
+              <TouchableOpacity
+                style={styles.quickActionBtn}
+                onPress={handleEmail}
+              >
                 <Text style={styles.quickActionIcon}>✉️</Text>
                 <Text style={styles.quickActionText}>Email</Text>
               </TouchableOpacity>
@@ -402,7 +518,7 @@ export default function BorrowerDetail() {
                   ? '#fef2f2'
                   : outstanding < 0
                   ? '#ecfdf5'
-                  : '#f9fafb',
+                  : '#f0fdf4',
             },
           ]}
         >
@@ -422,16 +538,39 @@ export default function BorrowerDetail() {
                     ? '#dc2626'
                     : outstanding < 0
                     ? '#059669'
-                    : '#6b7280',
+                    : '#059669',
               },
             ]}
           >
             {formatCurrency(Math.abs(outstanding))}
           </Text>
           <Text style={styles.outstandingMeta}>
-            {transactions.length} transaction{transactions.length !== 1 ? 's' : ''}
+            {transactions.length} active transaction
+            {transactions.length !== 1 ? 's' : ''}
+            {settlements.length > 0
+              ? ` • ${settlements.length} settlement${
+                  settlements.length !== 1 ? 's' : ''
+                }`
+              : ''}
           </Text>
         </Card>
+
+        {/* Settle Button */}
+        {canSettle && (
+          <TouchableOpacity
+            style={styles.settleButton}
+            onPress={handleOpenSettle}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.settleButtonIcon}>🤝</Text>
+            <View>
+              <Text style={styles.settleButtonText}>Settle Account</Text>
+              <Text style={styles.settleButtonDesc}>
+                Mark all current transactions as completed
+              </Text>
+            </View>
+          </TouchableOpacity>
+        )}
 
         {/* Chart */}
         {(totalGiven > 0 || totalReceived > 0) && (
@@ -477,91 +616,322 @@ export default function BorrowerDetail() {
           </TouchableOpacity>
         </View>
 
-        {/* Date Filter */}
-        <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
-          <DateRangeFilter
-            startDate={startDate}
-            endDate={endDate}
-            onChange={(s, e) => {
-              setStartDate(s);
-              setEndDate(e);
-            }}
-            onClear={clearDateFilter}
-            title="📅 Filter Transactions"
-            autoSetDefaults={false}
-          />
+        {/* View Toggle: Active / Settled */}
+        <View style={styles.viewToggle}>
+          <TouchableOpacity
+            style={[
+              styles.viewToggleBtn,
+              activeViewTab === 'active' && styles.viewToggleActive,
+            ]}
+            onPress={() => setActiveViewTab('active')}
+          >
+            <Text
+              style={[
+                styles.viewToggleText,
+                activeViewTab === 'active' && styles.viewToggleTextActive,
+              ]}
+            >
+              📋 Active ({transactions.length})
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.viewToggleBtn,
+              activeViewTab === 'settled' && styles.viewToggleActive,
+            ]}
+            onPress={() => setActiveViewTab('settled')}
+          >
+            <Text
+              style={[
+                styles.viewToggleText,
+                activeViewTab === 'settled' && styles.viewToggleTextActive,
+              ]}
+            >
+              ✅ Settled ({settlements.length})
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Transactions List */}
-        <Card style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            📋 Transactions ({transactions.length})
-          </Text>
-          {transactions.length === 0 ? (
-            <Text style={styles.empty}>
-              No transactions{startDate || endDate ? ' in this date range' : ' yet'}
-            </Text>
-          ) : (
-            transactions.map((t) => (
-              <View key={t.id} style={styles.txRow}>
-                <View
-                  style={[
-                    styles.txIcon,
-                    {
-                      backgroundColor:
-                        t.type === 'given' ? '#fef2f2' : '#ecfdf5',
-                    },
-                  ]}
-                >
-                  <Text style={styles.txIconText}>
-                    {t.type === 'given' ? '↗️' : '↙️'}
-                  </Text>
-                </View>
+        {/* Active Transactions */}
+        {activeViewTab === 'active' && (
+          <>
+            <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
+              <DateRangeFilter
+                startDate={startDate}
+                endDate={endDate}
+                onChange={(s, e) => {
+                  setStartDate(s);
+                  setEndDate(e);
+                }}
+                onClear={clearDateFilter}
+                title="📅 Filter Transactions"
+                autoSetDefaults={false}
+              />
+            </View>
 
-                <View style={styles.txInfo}>
-                  <Text style={styles.txType}>
-                    {t.type === 'given' ? 'Money Given' : 'Money Received'}
-                  </Text>
-                  <Text style={styles.txDate}>📅 {t.date}</Text>
-                  {t.description && (
-                    <Text style={styles.txDesc}>{t.description}</Text>
+            <Card style={styles.section}>
+              <Text style={styles.sectionTitle}>
+                📋 Active Transactions ({transactions.length})
+              </Text>
+              {transactions.length === 0 ? (
+                <Text style={styles.empty}>
+                  No active transactions
+                  {startDate || endDate ? ' in this date range' : ''}
+                </Text>
+              ) : (
+                transactions.map((t) => (
+                  <View key={t.id} style={styles.txRow}>
+                    <View
+                      style={[
+                        styles.txIcon,
+                        {
+                          backgroundColor:
+                            t.type === 'given' ? '#fef2f2' : '#ecfdf5',
+                        },
+                      ]}
+                    >
+                      <Text style={styles.txIconText}>
+                        {t.type === 'given' ? '↗️' : '↙️'}
+                      </Text>
+                    </View>
+
+                    <View style={styles.txInfo}>
+                      <Text style={styles.txType}>
+                        {t.type === 'given' ? 'Money Given' : 'Money Received'}
+                      </Text>
+                      <Text style={styles.txDate}>📅 {t.date}</Text>
+                      {t.description && (
+                        <Text style={styles.txDesc}>{t.description}</Text>
+                      )}
+                    </View>
+
+                    <View style={styles.txRight}>
+                      <Text
+                        style={[
+                          styles.txAmount,
+                          t.type === 'given' ? styles.negative : styles.positive,
+                        ]}
+                      >
+                        {t.type === 'given' ? '-' : '+'}
+                        {formatCurrency(t.amount)}
+                      </Text>
+                      <View style={styles.txActions}>
+                        <TouchableOpacity
+                          onPress={() => openTransactionModal(t)}
+                          style={styles.txEditBtn}
+                        >
+                          <Text style={styles.txEditBtnText}>✏️</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => handleDeleteTransaction(t.id)}
+                        >
+                          <Text style={styles.txDeleteBtn}>🗑️</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                ))
+              )}
+            </Card>
+          </>
+        )}
+
+        {/* Settlement History */}
+        {activeViewTab === 'settled' && (
+          <Card style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              ✅ Settlement History ({settlements.length})
+            </Text>
+            {settlements.length === 0 ? (
+              <Text style={styles.empty}>No settlements yet</Text>
+            ) : (
+              settlements.map((s) => (
+                <View key={s.id} style={styles.settlementRow}>
+
+                  {/* Header - tappable to expand/collapse */}
+                  <TouchableOpacity
+                    onPress={() => handleToggleSettlement(s)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.settlementHeader}>
+                      <View style={styles.settlementBadge}>
+                        <Text style={styles.settlementBadgeText}>🤝</Text>
+                      </View>
+                      <View style={styles.settlementInfo}>
+                        <Text style={styles.settlementDate}>
+                          Settled on {formatDateTime(s.settled_at)}
+                        </Text>
+                        <Text style={styles.settlementMeta}>
+                          {s.transaction_count} transaction
+                          {s.transaction_count !== 1 ? 's' : ''} •{' '}
+                          {expandedSettlement === s.id
+                            ? 'Tap to collapse ▲'
+                            : 'Tap to expand ▼'}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => handleUndoSettlement(s.id)}
+                        style={styles.undoBtn}
+                      >
+                        <Text style={styles.undoBtnText}>↩️ Undo</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Summary row */}
+                  <View style={styles.settlementDetails}>
+                    <View style={styles.settlementDetailItem}>
+                      <Text style={styles.settlementDetailLabel}>Given</Text>
+                      <Text
+                        style={[
+                          styles.settlementDetailValue,
+                          { color: '#dc2626' },
+                        ]}
+                      >
+                        {formatCurrency(s.total_given)}
+                      </Text>
+                    </View>
+                    <View style={styles.settlementDetailItem}>
+                      <Text style={styles.settlementDetailLabel}>Received</Text>
+                      <Text
+                        style={[
+                          styles.settlementDetailValue,
+                          { color: '#059669' },
+                        ]}
+                      >
+                        {formatCurrency(s.total_received)}
+                      </Text>
+                    </View>
+                    <View style={styles.settlementDetailItem}>
+                      <Text style={styles.settlementDetailLabel}>Balance</Text>
+                      <Text
+                        style={[
+                          styles.settlementDetailValue,
+                          {
+                            color:
+                              s.balance > 0
+                                ? '#dc2626'
+                                : s.balance < 0
+                                ? '#059669'
+                                : '#6b7280',
+                          },
+                        ]}
+                      >
+                        {formatCurrency(Math.abs(s.balance))}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Notes */}
+                  {s.notes && (
+                    <Text style={styles.settlementNotes}>📝 {s.notes}</Text>
+                  )}
+
+                  {/* Expanded Transaction List */}
+                  {expandedSettlement === s.id && (
+                    <View style={styles.settledTxContainer}>
+                      <View style={styles.settledTxDivider} />
+                      <Text style={styles.settledTxTitle}>
+                        📋 Settled Transactions
+                      </Text>
+
+                      {loadingSettlementTxs ? (
+                        <Text style={styles.settledTxLoading}>
+                          Loading transactions...
+                        </Text>
+                      ) : settlementTxs.length === 0 ? (
+                        <Text style={styles.settledTxEmpty}>
+                          No transactions found
+                        </Text>
+                      ) : (
+                        settlementTxs.map((t) => (
+                          <View key={t.id} style={styles.settledTxRow}>
+                            <View
+                              style={[
+                                styles.settledTxDot,
+                                {
+                                  backgroundColor:
+                                    t.type === 'given' ? '#fecaca' : '#bbf7d0',
+                                },
+                              ]}
+                            >
+                              <Text style={styles.settledTxDotText}>
+                                {t.type === 'given' ? '↗' : '↙'}
+                              </Text>
+                            </View>
+
+                            <View style={styles.settledTxInfo}>
+                              <Text style={styles.settledTxType}>
+                                {t.type === 'given'
+                                  ? 'Money Given'
+                                  : 'Money Received'}
+                              </Text>
+                              <Text style={styles.settledTxDate}>
+                                {t.date}
+                              </Text>
+                              {t.description && (
+                                <Text style={styles.settledTxDesc}>
+                                  {t.description}
+                                </Text>
+                              )}
+                            </View>
+
+                            <Text
+                              style={[
+                                styles.settledTxAmount,
+                                t.type === 'given'
+                                  ? { color: '#dc2626' }
+                                  : { color: '#059669' },
+                              ]}
+                            >
+                              {t.type === 'given' ? '-' : '+'}
+                              {formatCurrency(t.amount)}
+                            </Text>
+                          </View>
+                        ))
+                      )}
+
+                      {/* Net Balance */}
+                      {settlementTxs.length > 0 && (
+                        <View style={styles.settledTxTotalRow}>
+                          <Text style={styles.settledTxTotalLabel}>
+                            Net Balance
+                          </Text>
+                          <Text
+                            style={[
+                              styles.settledTxTotalValue,
+                              {
+                                color:
+                                  s.balance > 0
+                                    ? '#dc2626'
+                                    : s.balance < 0
+                                    ? '#059669'
+                                    : '#6b7280',
+                              },
+                            ]}
+                          >
+                            {s.balance > 0
+                              ? `Owed ${formatCurrency(s.balance)}`
+                              : s.balance < 0
+                              ? `Overpaid ${formatCurrency(Math.abs(s.balance))}`
+                              : 'Fully Settled'}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
                   )}
                 </View>
-
-                <View style={styles.txRight}>
-                  <Text
-                    style={[
-                      styles.txAmount,
-                      t.type === 'given' ? styles.negative : styles.positive,
-                    ]}
-                  >
-                    {t.type === 'given' ? '-' : '+'}
-                    {formatCurrency(t.amount)}
-                  </Text>
-                  <View style={styles.txActions}>
-                    <TouchableOpacity
-                      onPress={() => openTransactionModal(t)}
-                      style={styles.txEditBtn}
-                    >
-                      <Text style={styles.txEditBtnText}>✏️</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => handleDeleteTransaction(t.id)}
-                    >
-                      <Text style={styles.txDeleteBtn}>🗑️</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-            ))
-          )}
-        </Card>
+              ))
+            )}
+          </Card>
+        )}
 
         {/* Danger Zone */}
         <Card style={styles.dangerCard}>
           <Text style={styles.dangerTitle}>⚠️ Danger Zone</Text>
           <Text style={styles.dangerDesc}>
-            Deleting this borrower will remove all their transactions permanently.
+            Deleting this borrower will remove all transactions and settlements
+            permanently.
           </Text>
           <Button
             title="🗑️ Delete Borrower"
@@ -581,7 +951,6 @@ export default function BorrowerDetail() {
               {editingTransaction ? 'Edit Transaction' : 'Add Transaction'}
             </Text>
 
-            {/* Type Toggle */}
             <View style={styles.typeToggle}>
               <TouchableOpacity
                 style={[
@@ -614,8 +983,7 @@ export default function BorrowerDetail() {
                 <Text
                   style={[
                     styles.typeText,
-                    transactionForm.type === 'received' &&
-                      styles.typeTextActive,
+                    transactionForm.type === 'received' && styles.typeTextActive,
                   ]}
                 >
                   💰 Received
@@ -660,6 +1028,105 @@ export default function BorrowerDetail() {
                 title="Save"
                 onPress={handleSaveTransaction}
                 loading={saving}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Settle Modal ───────────────────────────────────────────── */}
+      <Modal visible={settleModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>🤝 Settle Account</Text>
+
+            <Card
+              style={[styles.settlePreviewCard, { backgroundColor: '#f0fdf4' }]}
+            >
+              <Text style={styles.settlePreviewTitle}>Settlement Summary</Text>
+
+              <View style={styles.settlePreviewRow}>
+                <Text style={styles.settlePreviewLabel}>Total Given</Text>
+                <Text
+                  style={[styles.settlePreviewValue, { color: '#dc2626' }]}
+                >
+                  {formatCurrency(totalGiven)}
+                </Text>
+              </View>
+
+              <View style={styles.settlePreviewRow}>
+                <Text style={styles.settlePreviewLabel}>Total Received</Text>
+                <Text
+                  style={[styles.settlePreviewValue, { color: '#059669' }]}
+                >
+                  {formatCurrency(totalReceived)}
+                </Text>
+              </View>
+
+              <View
+                style={[
+                  styles.settlePreviewRow,
+                  {
+                    borderTopWidth: 1,
+                    borderTopColor: '#d1fae5',
+                    paddingTop: 10,
+                    marginTop: 6,
+                  },
+                ]}
+              >
+                <Text
+                  style={[styles.settlePreviewLabel, { fontWeight: '700' }]}
+                >
+                  Outstanding
+                </Text>
+                <Text
+                  style={[
+                    styles.settlePreviewValue,
+                    {
+                      color:
+                        outstanding > 0
+                          ? '#dc2626'
+                          : outstanding < 0
+                          ? '#059669'
+                          : '#6b7280',
+                      fontSize: 18,
+                    },
+                  ]}
+                >
+                  {formatCurrency(Math.abs(outstanding))}
+                </Text>
+              </View>
+
+              <Text style={styles.settlePreviewMeta}>
+                {transactions.length} transaction
+                {transactions.length !== 1 ? 's' : ''} will be settled
+              </Text>
+            </Card>
+
+            <Input
+              label="Settlement Notes (optional)"
+              value={settleNotes}
+              onChangeText={setSettleNotes}
+              placeholder="e.g., Settled via UPI on 15 Jul"
+            />
+
+            <Text style={styles.settleWarning}>
+              ⚠️ This will mark all current transactions as completed. They
+              won't appear in your active totals anymore. You can undo this from
+              Settlement History.
+            </Text>
+
+            <View style={styles.modalButtons}>
+              <Button
+                title="Cancel"
+                variant="secondary"
+                onPress={() => setSettleModal(false)}
+              />
+              <Button
+                title="🤝 Settle Now"
+                variant="success"
+                onPress={handleSettleBorrower}
+                loading={settleSaving}
               />
             </View>
           </View>
@@ -776,12 +1243,7 @@ const styles = StyleSheet.create({
   profileInfo: { flex: 1, marginLeft: 14 },
   profileName: { fontSize: 22, fontWeight: '700', color: '#111827' },
   profileMeta: { fontSize: 13, color: '#6b7280', marginTop: 3 },
-  profileNotes: {
-    fontSize: 13,
-    color: '#6b7280',
-    marginTop: 3,
-    fontStyle: 'italic',
-  },
+  profileNotes: { fontSize: 13, color: '#6b7280', marginTop: 3, fontStyle: 'italic' },
 
   // Quick actions
   quickActions: {
@@ -813,11 +1275,7 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 12,
   },
-  summaryCard: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 14,
-  },
+  summaryCard: { flex: 1, alignItems: 'center', paddingVertical: 14 },
   summaryEmoji: { fontSize: 22, marginBottom: 4 },
   summaryLabel: { fontSize: 11, color: '#6b7280' },
   summaryValue: { fontSize: 20, fontWeight: '800', marginTop: 4 },
@@ -825,7 +1283,7 @@ const styles = StyleSheet.create({
   // Outstanding
   outstandingCard: {
     marginHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 12,
     alignItems: 'center',
     paddingVertical: 18,
   },
@@ -833,15 +1291,46 @@ const styles = StyleSheet.create({
   outstandingValue: { fontSize: 32, fontWeight: '800', marginTop: 4 },
   outstandingMeta: { fontSize: 12, color: '#9ca3af', marginTop: 6 },
 
+  // Settle button
+  settleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1.5,
+    borderColor: '#86efac',
+    borderRadius: 14,
+    padding: 16,
+  },
+  settleButtonIcon: { fontSize: 28 },
+  settleButtonText: { fontSize: 16, fontWeight: '700', color: '#059669' },
+  settleButtonDesc: { fontSize: 12, color: '#6b7280', marginTop: 2 },
+
   // Section
   section: { marginHorizontal: 16, marginBottom: 16 },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 14,
-  },
+  sectionTitle: { fontSize: 16, fontWeight: '600', color: '#111827', marginBottom: 14 },
   empty: { textAlign: 'center', color: '#9ca3af', paddingVertical: 20 },
+
+  // View toggle
+  viewToggle: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 8,
+    padding: 4,
+  },
+  viewToggleBtn: {
+    flex: 1,
+    paddingVertical: 9,
+    alignItems: 'center',
+    borderRadius: 6,
+  },
+  viewToggleActive: { backgroundColor: '#fff' },
+  viewToggleText: { fontSize: 13, color: '#6b7280', fontWeight: '500' },
+  viewToggleTextActive: { color: '#111827', fontWeight: '600' },
 
   // Quick add
   quickAddRow: {
@@ -883,12 +1372,7 @@ const styles = StyleSheet.create({
   txInfo: { flex: 1, marginLeft: 10 },
   txType: { fontSize: 14, fontWeight: '500', color: '#111827' },
   txDate: { fontSize: 12, color: '#6b7280', marginTop: 2 },
-  txDesc: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginTop: 3,
-    fontStyle: 'italic',
-  },
+  txDesc: { fontSize: 12, color: '#6b7280', marginTop: 3, fontStyle: 'italic' },
   txRight: { alignItems: 'flex-end' },
   txAmount: { fontSize: 16, fontWeight: '700' },
   txActions: { flexDirection: 'row', gap: 4, marginTop: 6 },
@@ -898,6 +1382,120 @@ const styles = StyleSheet.create({
 
   positive: { color: '#059669' },
   negative: { color: '#dc2626' },
+
+  // Settlement rows
+  settlementRow: {
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  settlementHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  settlementBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#d1fae5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  settlementBadgeText: { fontSize: 18 },
+  settlementInfo: { flex: 1, marginLeft: 10 },
+  settlementDate: { fontSize: 14, fontWeight: '600', color: '#111827' },
+  settlementMeta: { fontSize: 12, color: '#6b7280', marginTop: 2 },
+  undoBtn: {
+    backgroundColor: '#fff7ed',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+  },
+  undoBtnText: { fontSize: 12, fontWeight: '600', color: '#ea580c' },
+  settlementDetails: { flexDirection: 'row', gap: 8 },
+  settlementDetailItem: {
+    flex: 1,
+    backgroundColor: '#fff',
+    padding: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  settlementDetailLabel: { fontSize: 10, color: '#6b7280' },
+  settlementDetailValue: { fontSize: 14, fontWeight: '700', marginTop: 4 },
+  settlementNotes: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontStyle: 'italic',
+    marginTop: 10,
+  },
+
+  // Settled transaction list
+  settledTxContainer: { marginTop: 12 },
+  settledTxDivider: {
+    height: 1,
+    backgroundColor: '#e5e7eb',
+    marginBottom: 12,
+  },
+  settledTxTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#374151',
+    marginBottom: 10,
+  },
+  settledTxLoading: {
+    textAlign: 'center',
+    color: '#9ca3af',
+    fontSize: 13,
+    paddingVertical: 12,
+  },
+  settledTxEmpty: {
+    textAlign: 'center',
+    color: '#9ca3af',
+    fontSize: 13,
+    paddingVertical: 12,
+  },
+  settledTxRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  settledTxDot: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  settledTxDotText: { fontSize: 13, fontWeight: '700', color: '#374151' },
+  settledTxInfo: { flex: 1, marginLeft: 10 },
+  settledTxType: { fontSize: 13, fontWeight: '500', color: '#374151' },
+  settledTxDate: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
+  settledTxDesc: {
+    fontSize: 11,
+    color: '#9ca3af',
+    marginTop: 2,
+    fontStyle: 'italic',
+  },
+  settledTxAmount: { fontSize: 14, fontWeight: '700' },
+  settledTxTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1.5,
+    borderTopColor: '#d1d5db',
+  },
+  settledTxTotalLabel: { fontSize: 13, fontWeight: '700', color: '#374151' },
+  settledTxTotalValue: { fontSize: 15, fontWeight: '800' },
 
   // Danger zone
   dangerCard: {
@@ -928,10 +1526,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     maxHeight: '92%',
   },
-  modalInner: {
-    padding: 20,
-    paddingBottom: 40,
-  },
+  modalInner: { padding: 20, paddingBottom: 40 },
   modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 16 },
   modalButtons: { flexDirection: 'row', gap: 12, marginTop: 16 },
 
@@ -948,4 +1543,38 @@ const styles = StyleSheet.create({
   typeReceivedActive: { backgroundColor: '#059669' },
   typeText: { fontSize: 14, fontWeight: '500', color: '#6b7280' },
   typeTextActive: { color: '#fff' },
+
+  // Settle modal
+  settlePreviewCard: { marginBottom: 16, borderWidth: 0 },
+  settlePreviewTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#059669',
+    marginBottom: 12,
+  },
+  settlePreviewRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  settlePreviewLabel: { fontSize: 14, color: '#374151' },
+  settlePreviewValue: { fontSize: 15, fontWeight: '700' },
+  settlePreviewMeta: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 10,
+    textAlign: 'center',
+  },
+  settleWarning: {
+    fontSize: 12,
+    color: '#92400e',
+    backgroundColor: '#fffbeb',
+    padding: 12,
+    borderRadius: 8,
+    lineHeight: 18,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+  },
 });

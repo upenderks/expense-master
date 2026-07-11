@@ -91,11 +91,21 @@ export async function importBackup(): Promise<boolean> {
             style: 'destructive',
             onPress: async () => {
               try {
-                // Close DB and reset singleton
+                // Step 1: Get current DB and close it
                 const db = await getDatabase();
-                await db.closeAsync();
-                resetDatabaseInstance(); // 👈 reset so it reopens fresh
+                try {
+                  await db.closeAsync();
+                } catch (closeErr) {
+                  console.warn('Close error (safe to ignore):', closeErr);
+                }
 
+                // Step 2: Reset singleton immediately
+                resetDatabaseInstance();
+
+                // Step 3: Small delay to ensure native side releases the file
+                await new Promise((r) => setTimeout(r, 300));
+
+                // Step 4: Remove old DB files
                 const sqliteDir = `${FileSystem.documentDirectory}SQLite`;
                 const dirInfo = await FileSystem.getInfoAsync(sqliteDir);
                 if (!dirInfo.exists) {
@@ -105,13 +115,21 @@ export async function importBackup(): Promise<boolean> {
                 }
 
                 await FileSystem.deleteAsync(DB_PATH, { idempotent: true });
-                await FileSystem.deleteAsync(`${DB_PATH}-wal`, { idempotent: true });
-                await FileSystem.deleteAsync(`${DB_PATH}-shm`, { idempotent: true });
+                await FileSystem.deleteAsync(`${DB_PATH}-wal`, {
+                  idempotent: true,
+                });
+                await FileSystem.deleteAsync(`${DB_PATH}-shm`, {
+                  idempotent: true,
+                });
 
+                // Step 5: Copy backup file
                 await FileSystem.copyAsync({
                   from: pickedFile.uri,
                   to: DB_PATH,
                 });
+
+                // Step 6: Reset singleton again to force fresh open
+                resetDatabaseInstance();
 
                 Alert.alert(
                   '✅ Restore Successful',

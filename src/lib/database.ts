@@ -1,18 +1,73 @@
 import * as SQLite from 'expo-sqlite';
 
 let db: SQLite.SQLiteDatabase | null = null;
+let isOpening = false;
+let openPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
-  if (!db) {
-    db = await SQLite.openDatabaseAsync('expense_tracker.db');
-    await initializeDatabase(db);
+  // If already opening, wait for it to finish
+  if (openPromise) {
+    return openPromise;
   }
-  return db;
+
+  // If db exists, validate it
+  if (db) {
+    try {
+      await db.getFirstAsync('SELECT 1');
+      return db;
+    } catch {
+      console.log('DB connection invalid, reopening...');
+      db = null;
+    }
+  }
+
+  // Open new connection with lock
+  openPromise = (async () => {
+    try {
+      const database = await SQLite.openDatabaseAsync('expense_tracker.db');
+      await initializeDatabase(database);
+      db = database;
+      return database;
+    } finally {
+      openPromise = null;
+    }
+  })();
+
+  return openPromise;
+}
+
+// ── Safe executor - auto retries on connection loss ───────────────────────────
+
+async function safeExecute<T>(
+  operation: (database: SQLite.SQLiteDatabase) => Promise<T>
+): Promise<T> {
+  try {
+    const database = await getDatabase();
+    return await operation(database);
+  } catch (error: any) {
+    const msg = String(error);
+    if (
+      msg.includes('NullPointerException') ||
+      msg.includes('prepareAsync') ||
+      msg.includes('finalizeAsync') ||
+      msg.includes('closed') ||
+      msg.includes('null')
+    ) {
+      console.log('DB error, resetting and retrying...');
+      db = null;
+      openPromise = null;
+      await new Promise((r) => setTimeout(r, 200));
+      const database = await getDatabase();
+      return await operation(database);
+    }
+    throw error;
+  }
 }
 
 // Call this after restore to reset the singleton
 export function resetDatabaseInstance(): void {
   db = null;
+  openPromise = null;
 }
 
 async function initializeDatabase(database: SQLite.SQLiteDatabase): Promise<void> {
@@ -67,6 +122,8 @@ async function initializeDatabase(database: SQLite.SQLiteDatabase): Promise<void
       date TEXT NOT NULL,
       description TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      settled_at TEXT,
+      is_settled INTEGER DEFAULT 0,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
       FOREIGN KEY (borrower_id) REFERENCES borrowers(id) ON DELETE CASCADE
     );
@@ -92,6 +149,21 @@ async function initializeDatabase(database: SQLite.SQLiteDatabase): Promise<void
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
       FOREIGN KEY (category_id) REFERENCES expense_categories(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS settlements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      borrower_id INTEGER NOT NULL,
+      total_given REAL NOT NULL DEFAULT 0,
+      total_received REAL NOT NULL DEFAULT 0,
+      balance REAL NOT NULL DEFAULT 0,
+      transaction_count INTEGER NOT NULL DEFAULT 0,
+      notes TEXT,
+      settled_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (borrower_id) REFERENCES borrowers(id) ON DELETE CASCADE
+    );
+
   `);
 }
 
@@ -127,13 +199,31 @@ export async function getUserByEmail(email: string): Promise<any> {
 // ==================== BORROWERS ====================
 export async function getBorrowers(userId: number): Promise<any[]> {
   const db = await getDatabase();
-  return await db.getAllAsync(`
+  return await db.getAllAsync(
+    `
     SELECT b.*,
-      COALESCE((SELECT SUM(CASE WHEN type = 'given' THEN amount ELSE -amount END) FROM money_transactions WHERE borrower_id = b.id), 0) as balance
+      COALESCE((
+        SELECT SUM(CASE WHEN type = 'given' THEN amount ELSE -amount END)
+        FROM money_transactions 
+        WHERE borrower_id = b.id AND is_settled = 0
+      ), 0) as balance,
+      COALESCE((
+        SELECT SUM(CASE WHEN type = 'given' THEN amount ELSE 0 END)
+        FROM money_transactions 
+        WHERE borrower_id = b.id AND is_settled = 0
+      ), 0) as unsettled_given,
+      COALESCE((
+        SELECT SUM(CASE WHEN type = 'received' THEN amount ELSE 0 END)
+        FROM money_transactions 
+        WHERE borrower_id = b.id AND is_settled = 0
+      ), 0) as unsettled_received,
+      (SELECT COUNT(*) FROM settlements WHERE borrower_id = b.id) as settlement_count
     FROM borrowers b
     WHERE b.user_id = ?
     ORDER BY b.name
-  `, [userId]);
+  `,
+    [userId]
+  );
 }
 
 export async function createBorrower(userId: number, name: string, phone?: string, email?: string, address?: string, notes?: string): Promise<number> {
@@ -160,7 +250,15 @@ export async function deleteBorrower(id: number, userId: number): Promise<void> 
 
 // ==================== MONEY TRANSACTIONS ====================
 // NEW: Updated to support date filtering
-export async function getTransactions(userId: number, filters?: { borrowerId?: number; startDate?: string; endDate?: string }): Promise<any[]> {
+export async function getTransactions(
+  userId: number,
+  filters?: {
+    borrowerId?: number;
+    startDate?: string;
+    endDate?: string;
+    includeSettled?: boolean;
+  }
+): Promise<any[]> {
   const db = await getDatabase();
   let query = `
     SELECT t.*, b.name as borrower_name
@@ -169,7 +267,12 @@ export async function getTransactions(userId: number, filters?: { borrowerId?: n
     WHERE t.user_id = ?
   `;
   const params: any[] = [userId];
-  
+
+  // By default, only show unsettled transactions
+  if (!filters?.includeSettled) {
+    query += ' AND t.is_settled = 0';
+  }
+
   if (filters?.borrowerId) {
     query += ' AND t.borrower_id = ?';
     params.push(filters.borrowerId);
@@ -182,7 +285,7 @@ export async function getTransactions(userId: number, filters?: { borrowerId?: n
     query += ' AND t.date <= ?';
     params.push(filters.endDate);
   }
-  
+
   query += ' ORDER BY t.date DESC, t.id DESC';
   return await db.getAllAsync(query, params);
 }
@@ -311,11 +414,147 @@ export async function deleteExpense(id: number, userId: number): Promise<void> {
   await db.runAsync('DELETE FROM expenses WHERE id = ? AND user_id = ?', [id, userId]);
 }
 
+// ==================== SETTLEMENTS ====================
+
+export async function settleBorrower(
+    userId: number,
+    borrowerId: number,
+    notes?: string
+  ): Promise<number> {
+    const db = await getDatabase();
+
+    // 1. Get all unsettled transactions for this borrower
+    const unsettled = await db.getAllAsync<{
+      id: number;
+      type: string;
+      amount: number;
+    }>(
+      `SELECT id, type, amount FROM money_transactions 
+      WHERE user_id = ? AND borrower_id = ? AND is_settled = 0`,
+      [userId, borrowerId]
+    );
+
+    if (unsettled.length === 0) {
+      throw new Error('No unsettled transactions to settle');
+    }
+
+    // 2. Calculate totals
+    const totalGiven = unsettled
+      .filter((t) => t.type === 'given')
+      .reduce((s, t) => s + t.amount, 0);
+
+    const totalReceived = unsettled
+      .filter((t) => t.type === 'received')
+      .reduce((s, t) => s + t.amount, 0);
+
+    const balance = totalGiven - totalReceived;
+    const settledAt = new Date().toISOString();
+
+    // 3. Create settlement record
+    const result = await db.runAsync(
+      `INSERT INTO settlements (user_id, borrower_id, total_given, total_received, balance, transaction_count, notes, settled_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        userId,
+        borrowerId,
+        totalGiven,
+        totalReceived,
+        balance,
+        unsettled.length,
+        notes || null,
+        settledAt,
+      ]
+    );
+
+    // 4. Mark all unsettled transactions as settled
+    await db.runAsync(
+      `UPDATE money_transactions 
+      SET is_settled = 1, settled_at = ? 
+      WHERE user_id = ? AND borrower_id = ? AND is_settled = 0`,
+      [settledAt, userId, borrowerId]
+    );
+
+    return result.lastInsertRowId;
+  }
+
+  export async function getSettlements(
+    userId: number,
+    borrowerId?: number
+  ): Promise<any[]> {
+    const db = await getDatabase();
+    let query = `
+      SELECT s.*, b.name as borrower_name
+      FROM settlements s
+      LEFT JOIN borrowers b ON s.borrower_id = b.id
+      WHERE s.user_id = ?
+    `;
+    const params: any[] = [userId];
+
+    if (borrowerId) {
+      query += ' AND s.borrower_id = ?';
+      params.push(borrowerId);
+    }
+
+    query += ' ORDER BY s.settled_at DESC';
+    return await db.getAllAsync(query, params);
+  }
+
+  export async function getSettlementTransactions(
+    userId: number,
+    borrowerId: number,
+    settledAt: string
+  ): Promise<any[]> {
+    const db = await getDatabase();
+    return await db.getAllAsync(
+      `SELECT * FROM money_transactions 
+      WHERE user_id = ? AND borrower_id = ? AND settled_at = ?
+      ORDER BY date DESC`,
+      [userId, borrowerId, settledAt]
+    );
+  }
+
+  export async function deleteSettlement(
+    settlementId: number,
+    userId: number
+  ): Promise<void> {
+    const db = await getDatabase();
+
+    // Get settlement details
+    const settlement = await db.getFirstAsync<{
+      borrower_id: number;
+      settled_at: string;
+    }>(
+      'SELECT borrower_id, settled_at FROM settlements WHERE id = ? AND user_id = ?',
+      [settlementId, userId]
+    );
+
+    if (!settlement) {
+      throw new Error('Settlement not found');
+    }
+
+    // Unsettle the transactions
+    await db.runAsync(
+      `UPDATE money_transactions 
+      SET is_settled = 0, settled_at = NULL 
+      WHERE user_id = ? AND borrower_id = ? AND settled_at = ?`,
+      [userId, settlement.borrower_id, settlement.settled_at]
+    );
+
+    // Delete settlement record
+    await db.runAsync(
+      'DELETE FROM settlements WHERE id = ? AND user_id = ?',
+      [settlementId, userId]
+    );
+  }
+
 // ==================== DASHBOARD DATA ====================
 
-export async function getMoneyDashboardData(userId: number, filters?: { startDate?: string; endDate?: string }): Promise<any> {
+export async function getMoneyDashboardData(
+  userId: number,
+  filters?: { startDate?: string; endDate?: string }
+): Promise<any> {
   const db = await getDatabase();
-  
+
   let dateFilter = '';
   const params: any[] = [userId];
   if (filters?.startDate) {
@@ -326,42 +565,51 @@ export async function getMoneyDashboardData(userId: number, filters?: { startDat
     dateFilter += ' AND date <= ?';
     params.push(filters.endDate);
   }
-  
-  const totalGiven = await db.getFirstAsync<{total: number}>(
-    `SELECT COALESCE(SUM(amount), 0) as total FROM money_transactions WHERE user_id = ? AND type = 'given'${dateFilter}`, params
+
+  const totalGiven = await db.getFirstAsync<{ total: number }>(
+    `SELECT COALESCE(SUM(amount), 0) as total FROM money_transactions WHERE user_id = ? AND type = 'given' AND is_settled = 0${dateFilter}`,
+    params
   );
-  
-  const totalReceived = await db.getFirstAsync<{total: number}>(
-    `SELECT COALESCE(SUM(amount), 0) as total FROM money_transactions WHERE user_id = ? AND type = 'received'${dateFilter}`, params
+
+  const totalReceived = await db.getFirstAsync<{ total: number }>(
+    `SELECT COALESCE(SUM(amount), 0) as total FROM money_transactions WHERE user_id = ? AND type = 'received' AND is_settled = 0${dateFilter}`,
+    params
   );
-  
-  const borrowerCount = await db.getFirstAsync<{count: number}>(
-    'SELECT COUNT(*) as count FROM borrowers WHERE user_id = ?', [userId]
+
+  const borrowerCount = await db.getFirstAsync<{ count: number }>(
+    'SELECT COUNT(*) as count FROM borrowers WHERE user_id = ?',
+    [userId]
   );
-  
-  const borrowerBalances = await db.getAllAsync(`
+
+  const borrowerBalances = await db.getAllAsync(
+    `
     SELECT b.id, b.name, b.phone,
       COALESCE(SUM(CASE WHEN t.type = 'given' THEN t.amount ELSE -t.amount END), 0) as balance
     FROM borrowers b
-    LEFT JOIN money_transactions t ON b.id = t.borrower_id
+    LEFT JOIN money_transactions t ON b.id = t.borrower_id AND t.is_settled = 0
     WHERE b.user_id = ?
     GROUP BY b.id, b.name, b.phone
     ORDER BY balance DESC
-  `, [userId]);
-  
+  `,
+    [userId]
+  );
+
   const totalGivenAmount = totalGiven?.total || 0;
   const totalReceivedAmount = totalReceived?.total || 0;
   const outstanding = totalGivenAmount - totalReceivedAmount;
-  
-  const recentTransactions = await db.getAllAsync(`
+
+  const recentTransactions = await db.getAllAsync(
+    `
     SELECT t.*, b.name as borrower_name
     FROM money_transactions t
     LEFT JOIN borrowers b ON t.borrower_id = b.id
-    WHERE t.user_id = ?
+    WHERE t.user_id = ? AND t.is_settled = 0
     ORDER BY t.date DESC, t.id DESC
     LIMIT 5
-  `, [userId]);
-  
+  `,
+    [userId]
+  );
+
   return {
     totalGiven: totalGivenAmount,
     totalReceived: totalReceivedAmount,
@@ -423,4 +671,5 @@ export async function getExpenseDashboardData(userId: number, period: 'day' | 'w
     categoryTotals,
     recentExpenses,
   };
+  
 }
