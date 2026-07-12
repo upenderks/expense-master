@@ -39,15 +39,25 @@ export async function login(email: string, password: string): Promise<User> {
   if (!user) {
     throw new Error('Invalid email or password');
   }
-  
+
+  // Check if user is active
+  if (user.is_active === 0) {
+    throw new Error('Your account has been deactivated. Please contact admin.');
+  }
+
+  // Check if user is admin (admins can't login as regular user)
+  if (user.is_admin === 1) {
+    throw new Error('Admin accounts must use Admin Login.');
+  }
+
   const hashedPassword = hashPassword(password);
   if (user.password !== hashedPassword) {
     throw new Error('Invalid email or password');
   }
-  
+
   const sessionUser: User = { id: user.id, name: user.name, email: user.email };
   await setSession(sessionUser);
-  
+
   return sessionUser;
 }
 

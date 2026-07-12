@@ -21,6 +21,7 @@ import { DonutChart } from '../../src/components/charts/DonutChart';
 import { BarChart } from '../../src/components/charts/BarChart';
 import { HorizontalBarChart } from '../../src/components/charts/HorizontalBarChart';
 import DateRangeFilter from '../../src/components/DateRangeFilter';
+import { useAppSettings, FEATURE_KEYS } from '../../src/context/AppSettingsContext';
 
 type Module = 'money' | 'expense';
 type Period = 'day' | 'week' | 'month' | 'custom';
@@ -28,8 +29,13 @@ type Period = 'day' | 'week' | 'month' | 'custom';
 export default function Dashboard() {
   const { user } = useAuth();
   const { theme, isDark } = useTheme();
+  const { isEnabled, getSetting } = useAppSettings();
+  const moneyEnabled = isEnabled(FEATURE_KEYS.MODULE_MONEY);
+  const expenseEnabled = isEnabled(FEATURE_KEYS.MODULE_EXPENSE);
+  const chartsEnabled = isEnabled(FEATURE_KEYS.FEATURE_CHARTS);
 
-  const [activeModule, setActiveModule] = useState<Module>('expense');
+  const defaultModule = expenseEnabled ? 'expense' : moneyEnabled ? 'money' : 'expense';
+  const [activeModule, setActiveModule] = useState<Module>(defaultModule);
   const [expensePeriod, setExpensePeriod] = useState<Period>('month');
   const [moneyData, setMoneyData] = useState<any>(null);
   const [expenseData, setExpenseData] = useState<any>(null);
@@ -39,6 +45,7 @@ export default function Dashboard() {
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [showDateFilter, setShowDateFilter] = useState(false);
+  
 
   const loadData = async () => {
     if (!user) return;
@@ -333,39 +340,41 @@ export default function Dashboard() {
         Hello, {user?.name}! 👋
       </Text>
 
-      {/* Module Toggle */}
-      <View style={[
-        styles.moduleToggle,
-        { backgroundColor: isDark ? '#334155' : '#e5e7eb' },
-      ]}>
-        {(['expense', 'money'] as Module[]).map((m) => (
-          <TouchableOpacity
-            key={m}
-            style={[
-              styles.moduleButton,
-              activeModule === m && [
-                styles.activeModule,
-                { backgroundColor: theme.colors.surface },
-              ],
-            ]}
-            onPress={() => setActiveModule(m)}
-          >
-            <Text style={styles.moduleEmoji}>
-              {m === 'expense' ? '💸' : '💰'}
-            </Text>
-            <Text style={[
-              styles.moduleText,
-              { color: theme.colors.muted },
-              activeModule === m && { color: theme.colors.text, fontWeight: '600' },
-            ]}>
-              {m.charAt(0).toUpperCase() + m.slice(1)}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      {/* Module Toggle - only show if both modules enabled */}
+      {moneyEnabled && expenseEnabled && (
+        <View style={[
+          styles.moduleToggle,
+          { backgroundColor: isDark ? '#334155' : '#e5e7eb' },
+        ]}>
+          {(['expense', 'money'] as Module[]).map((m) => (
+            <TouchableOpacity
+              key={m}
+              style={[
+                styles.moduleButton,
+                activeModule === m && [
+                  styles.activeModule,
+                  { backgroundColor: theme.colors.surface },
+                ],
+              ]}
+              onPress={() => setActiveModule(m)}
+            >
+              <Text style={styles.moduleEmoji}>
+                {m === 'expense' ? '💸' : '💰'}
+              </Text>
+              <Text style={[
+                styles.moduleText,
+                { color: theme.colors.muted },
+                activeModule === m && { color: theme.colors.text, fontWeight: '600' },
+              ]}>
+                {m.charAt(0).toUpperCase() + m.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
       {/* ─── EXPENSE DASHBOARD ───────────────────────────────────────── */}
-      {activeModule === 'expense' && expenseData && (
+      {expenseEnabled && activeModule === 'expense' && expenseData && (
         <>
           {/* Period Selector */}
           <View style={[
@@ -447,32 +456,36 @@ export default function Dashboard() {
             </View>
           </Card>
 
-          {/* Donut Chart */}
-          <Card style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-              🥧 Category Breakdown
-            </Text>
-            <DonutChart
-              data={expenseDonutData}
-              size={190}
-              strokeWidth={30}
-              centerLabel="Total"
-              centerValue={formatShort(expenseData.totalExpenses)}
-            />
-          </Card>
+         {/* Donut Chart */}
+          {chartsEnabled && (
+            <Card style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                🥧 Category Breakdown
+              </Text>
+              <DonutChart
+                data={expenseDonutData}
+                size={190}
+                strokeWidth={30}
+                centerLabel="Total"
+                centerValue={formatShort(expenseData.totalExpenses)}
+              />
+            </Card>
+          )}
 
           {/* Bar Chart */}
-          <Card style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-              📊 {getBarChartTitle()}
-            </Text>
-            <BarChart
-              data={expenseBarData}
-              barColor="#ef4444"
-              height={160}
-              formatValue={formatShort}
-            />
-          </Card>
+          {chartsEnabled && (
+            <Card style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                📊 {getBarChartTitle()}
+              </Text>
+              <BarChart
+                data={expenseBarData}
+                barColor="#ef4444"
+                height={160}
+                formatValue={formatShort}
+              />
+            </Card>
+          )}
 
           {/* Category Progress */}
           <Card style={styles.section}>
@@ -562,7 +575,7 @@ export default function Dashboard() {
       )}
 
       {/* ─── MONEY DASHBOARD ─────────────────────────────────────────── */}
-      {activeModule === 'money' && moneyData && (
+      {moneyEnabled && activeModule === 'money' && moneyData && (
         <>
           {/* Stats Grid */}
           <View style={styles.statsGrid}>
@@ -585,6 +598,7 @@ export default function Dashboard() {
           </View>
 
           {/* Given vs Received */}
+          {chartsEnabled && (
           <Card style={styles.section}>
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
               📊 Given vs Received
@@ -617,8 +631,10 @@ export default function Dashboard() {
               </View>
             </View>
           </Card>
+          )}
 
           {/* Borrower Balances Chart */}
+          {chartsEnabled && (
           <Card style={styles.section}>
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
               👥 Borrower Balances
@@ -631,6 +647,7 @@ export default function Dashboard() {
               <HorizontalBarChart data={borrowerChartData} formatValue={formatShort} />
             )}
           </Card>
+          )}
 
           {/* Borrower List */}
           <Card style={styles.section}>

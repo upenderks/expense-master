@@ -98,6 +98,8 @@ async function initializeDatabase(database: SQLite.SQLiteDatabase): Promise<void
       name TEXT NOT NULL,
       email TEXT NOT NULL UNIQUE,
       password TEXT NOT NULL,
+      is_admin INTEGER DEFAULT 0,
+      is_active INTEGER DEFAULT 1,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -164,7 +166,24 @@ async function initializeDatabase(database: SQLite.SQLiteDatabase): Promise<void
       FOREIGN KEY (borrower_id) REFERENCES borrowers(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS user_settings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      setting_key TEXT NOT NULL,
+      setting_value TEXT NOT NULL,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(user_id, setting_key)
+    );
+
   `);
+  await ensureDefaultAdmin(database);
 }
 
 // ==================== USERS ====================
@@ -193,7 +212,7 @@ export async function createUser(name: string, email: string, password: string):
 
 export async function getUserByEmail(email: string): Promise<any> {
   const db = await getDatabase();
-  return await db.getFirstAsync('SELECT * FROM users WHERE email = ?', [email]);
+  return await db.getFirstAsync('SELECT * FROM users WHERE email = ? ', [email]);
 }
 
 // ==================== BORROWERS ====================
@@ -672,4 +691,230 @@ export async function getExpenseDashboardData(userId: number, period: 'day' | 'w
     recentExpenses,
   };
   
+}
+
+// ==================== ADMIN ====================
+
+async function ensureDefaultAdmin(
+  database: SQLite.SQLiteDatabase
+): Promise<void> {
+  try {
+    const admin = await database.getFirstAsync<{ id: number }>(
+      `SELECT id FROM users WHERE is_admin = 1`
+    );
+    if (!admin) {
+      // Create default admin
+      // Default password: admin123 (hashed same way as user passwords)
+      const defaultPassword = hashPasswordSimple('admin123');
+      await database.runAsync(
+        `INSERT OR IGNORE INTO users (name, email, password, is_admin) VALUES (?, ?, ?, 1)`,
+        ['Admin', 'admin@app.local', defaultPassword]
+      );
+      console.log('✅ Default admin created (admin@app.local / admin123)');
+    }
+  } catch (e) {
+    console.error('Admin creation error:', e);
+  }
+}
+
+function hashPasswordSimple(password: string): string {
+  let hash = 0;
+  for (let i = 0; i < password.length; i++) {
+    const char = password.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return `hash_${Math.abs(hash)}_${password.length}`;
+}
+
+// ==================== APP SETTINGS ====================
+
+export async function getAppSetting(key: string): Promise<string | null> {
+  return safeExecute(async (db) => {
+    const result = await db.getFirstAsync<{ value: string }>(
+      'SELECT value FROM app_settings WHERE key = ?',
+      [key]
+    );
+    return result?.value || null;
+  });
+}
+
+export async function setAppSetting(
+  key: string,
+  value: string
+): Promise<void> {
+  return safeExecute(async (db) => {
+    await db.runAsync(
+      `INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES (?, ?, datetime('now'))`,
+      [key, value]
+    );
+    // ensure the returned promise resolves to void rather than SQLiteRunResult
+    return undefined;
+  });
+}
+
+export async function getAllAppSettings(): Promise<Record<string, string>> {
+  return safeExecute(async (db) => {
+    const rows = await db.getAllAsync<{ key: string; value: string }>(
+      'SELECT key, value FROM app_settings'
+    );
+    const settings: Record<string, string> = {};
+    rows.forEach((r) => { settings[r.key] = r.value; });
+    return settings;
+  });
+}
+
+// ==================== USER SETTINGS ====================
+
+export async function getUserSetting(
+  userId: number,
+  key: string
+): Promise<string | null> {
+  return safeExecute(async (db) => {
+    const result = await db.getFirstAsync<{ setting_value: string }>(
+      'SELECT setting_value FROM user_settings WHERE user_id = ? AND setting_key = ?',
+      [userId, key]
+    );
+    return result?.setting_value || null;
+  });
+}
+
+export async function setUserSetting(
+  userId: number,
+  key: string,
+  value: string
+): Promise<void> {
+  return safeExecute(async (db) => {
+    await db.runAsync(
+      `INSERT OR REPLACE INTO user_settings (user_id, setting_key, setting_value, updated_at) VALUES (?, ?, ?, datetime('now'))`,
+      [userId, key, value]
+    );
+  });
+}
+
+export async function getAllUserSettings(
+  userId: number
+): Promise<Record<string, string>> {
+  return safeExecute(async (db) => {
+    const rows = await db.getAllAsync<{ setting_key: string; setting_value: string }>(
+      'SELECT setting_key, setting_value FROM user_settings WHERE user_id = ?',
+      [userId]
+    );
+    const settings: Record<string, string> = {};
+    rows.forEach((r) => { settings[r.setting_key] = r.setting_value; });
+    return settings;
+  });
+}
+
+export async function deleteAllUserSettings(userId: number): Promise<void> {
+  return safeExecute(async (db) => {
+    await db.runAsync('DELETE FROM user_settings WHERE user_id = ?', [userId]);
+    return undefined;
+  });
+}
+
+// ==================== ADMIN USER MANAGEMENT ====================
+
+export async function getAllUsers(): Promise<any[]> {
+  return safeExecute((db) =>
+    db.getAllAsync(
+      `SELECT id, name, email, is_admin, is_active, created_at FROM users ORDER BY is_admin DESC, name ASC`
+    )
+  );
+}
+
+export async function updateUserStatus(
+  userId: number,
+  isActive: boolean
+): Promise<void> {
+  return safeExecute(async (db) => {
+    await db.runAsync(
+      'UPDATE users SET is_active = ? WHERE id = ?',
+      [isActive ? 1 : 0, userId]
+    );
+  });
+}
+
+export async function resetUserPassword(
+  userId: number,
+  newPassword: string
+): Promise<void> {
+  return safeExecute(async (db) => {
+    await db.runAsync(
+      'UPDATE users SET password = ? WHERE id = ?',
+      [hashPasswordSimple(newPassword), userId]
+    );
+  });
+}
+
+export async function deleteUser(userId: number): Promise<void> {
+  return safeExecute(async (db) => {
+    await db.runAsync('DELETE FROM user_settings WHERE user_id = ?', [userId]);
+    await db.runAsync('DELETE FROM users WHERE id = ? AND is_admin = 0', [userId]);
+  });
+}
+
+export async function adminLogin(
+  email: string,
+  password: string
+): Promise<any> {
+  return safeExecute(async (db) => {
+    const user = await db.getFirstAsync<any>(
+      'SELECT * FROM users WHERE email = ? AND is_admin = 1',
+      [email]
+    );
+    if (!user) throw new Error('Admin account not found');
+    const hashed = hashPasswordSimple(password);
+    if (user.password !== hashed) throw new Error('Invalid admin password');
+    return { id: user.id, name: user.name, email: user.email, is_admin: true };
+  });
+}
+
+export async function changeAdminPassword(
+  adminId: number,
+  currentPassword: string,
+  newPassword: string
+): Promise<void> {
+  return safeExecute(async (db) => {
+    const admin = await db.getFirstAsync<{ password: string }>(
+      'SELECT password FROM users WHERE id = ? AND is_admin = 1',
+      [adminId]
+    );
+    if (!admin) throw new Error('Admin not found');
+    if (admin.password !== hashPasswordSimple(currentPassword)) {
+      throw new Error('Current password is incorrect');
+    }
+    await db.runAsync(
+      'UPDATE users SET password = ? WHERE id = ?',
+      [hashPasswordSimple(newPassword), adminId]
+    );
+  });
+}
+
+export async function getUserStats(userId: number): Promise<any> {
+  return safeExecute(async (db) => {
+    const expenses = await db.getFirstAsync<{ count: number; total: number }>(
+      'SELECT COUNT(*) as count, COALESCE(SUM(amount), 0) as total FROM expenses WHERE user_id = ?',
+      [userId]
+    );
+    const borrowers = await db.getFirstAsync<{ count: number }>(
+      'SELECT COUNT(*) as count FROM borrowers WHERE user_id = ?',
+      [userId]
+    );
+    const transactions = await db.getFirstAsync<{ count: number; given: number; received: number }>(
+      `SELECT COUNT(*) as count,
+        COALESCE(SUM(CASE WHEN type = 'given' THEN amount ELSE 0 END), 0) as given,
+        COALESCE(SUM(CASE WHEN type = 'received' THEN amount ELSE 0 END), 0) as received
+       FROM money_transactions WHERE user_id = ? AND is_settled = 0`,
+      [userId]
+    );
+    return {
+      expenseCount: expenses?.count || 0,
+      totalExpenses: expenses?.total || 0,
+      borrowerCount: borrowers?.count || 0,
+      transactionCount: transactions?.count || 0,
+      totalGiven: transactions?.given || 0,
+      totalReceived: transactions?.received || 0,
+    };
+  });
 }

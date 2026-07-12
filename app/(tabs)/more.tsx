@@ -22,6 +22,7 @@ import {
 import { exportBackup, importBackup } from '../../src/lib/backupService';
 import { Card } from '../../src/components/Card';
 import { Button } from '../../src/components/Button';
+import { useAppSettings, FEATURE_KEYS } from '../../src/context/AppSettingsContext';
 
 type ViewType = 'consolidated' | 'borrower-detail';
 
@@ -39,6 +40,11 @@ export default function More() {
   const [expensePeriod, setExpensePeriod] = useState('all');
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
+  const { isEnabled } = useAppSettings();
+  const moneyEnabled = isEnabled(FEATURE_KEYS.MODULE_MONEY);
+  const expenseEnabled = isEnabled(FEATURE_KEYS.MODULE_EXPENSE);
+  const backupEnabled = isEnabled(FEATURE_KEYS.FEATURE_BACKUP_RESTORE);
+  const darkModeEnabled = isEnabled(FEATURE_KEYS.FEATURE_DARK_MODE);
 
   const loadData = async () => {
     if (!user) return;
@@ -255,6 +261,7 @@ export default function More() {
       </Card>
 
       {/* Consolidated Summary */}
+      {moneyEnabled && (
       <Card style={[
         styles.consolidatedCard,
         { backgroundColor: isDark ? theme.colors.primarySoft : '#eff6ff' },
@@ -304,8 +311,10 @@ export default function More() {
           </Text>
         </View>
       </Card>
+      )}
 
       {/* Borrowers */}
+      {moneyEnabled && (
       <Card style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
@@ -354,8 +363,10 @@ export default function More() {
           ))
         )}
       </Card>
+       )}
 
       {/* Expenses */}
+      {expenseEnabled && (
       <Card style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
@@ -406,8 +417,10 @@ export default function More() {
           </Text>
         )}
       </Card>
+      )}
 
       {/* Appearance / Theme Card */}
+      {darkModeEnabled && (
       <Card style={[
         styles.themeCard,
         {
@@ -459,8 +472,10 @@ export default function More() {
           ))}
         </View>
       </Card>
+      )}
 
       {/* Backup & Restore Card */}
+      {backupEnabled && (
       <Card style={[
         styles.backupCard,
         {
@@ -534,6 +549,7 @@ export default function More() {
           </Text>
         </View>
       </Card>
+       )}
 
       {/* Logout */}
       <Card style={styles.logoutCard}>

@@ -1,17 +1,6 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  ReactNode,
-} from 'react';
-import {
-  User,
-  getSession,
-  login as authLogin,
-  signup as authSignup,
-  logout as authLogout,
-} from '../lib/auth';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { User, getSession, login as authLogin, signup as authSignup, logout as authLogout } from '../lib/auth';
+import { useAppSettings } from './AppSettingsContext';
 
 interface AuthContextType {
   user: User | null;
@@ -26,6 +15,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const { loadSettings } = useAppSettings();
 
   useEffect(() => {
     checkSession();
@@ -34,7 +24,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function checkSession() {
     try {
       const session = await getSession();
-      setUser(session);
+      if (session) {
+        setUser(session);
+        // Load user-specific settings
+        await loadSettings(session.id);
+      }
     } catch (error) {
       console.error('Session check error:', error);
     } finally {
@@ -43,13 +37,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function login(email: string, password: string) {
-    const user = await authLogin(email, password);
-    setUser(user);
+    const loggedUser = await authLogin(email, password);
+    setUser(loggedUser);
+    // Load settings for this user
+    await loadSettings(loggedUser.id);
   }
 
   async function signup(name: string, email: string, password: string) {
-    const user = await authSignup(name, email, password);
-    setUser(user);
+    const newUser = await authSignup(name, email, password);
+    setUser(newUser);
+    await loadSettings(newUser.id);
   }
 
   async function logout() {

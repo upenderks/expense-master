@@ -28,6 +28,7 @@ import { Input } from '../../src/components/Input';
 import { Select } from '../../src/components/Select';
 import DatePicker from '../../src/components/DatePicker';
 import DateRangeFilter from '../../src/components/DateRangeFilter';
+import { useAppSettings, FEATURE_KEYS } from '../../src/context/AppSettingsContext';
 
 type Tab = 'borrowers' | 'transactions';
 
@@ -46,6 +47,9 @@ export default function Money() {
   const [editingBorrower, setEditingBorrower] = useState<any>(null);
   const [transactionModal, setTransactionModal] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<any>(null);
+  const { isEnabled } = useAppSettings();
+  const settlementEnabled = isEnabled(FEATURE_KEYS.FEATURE_SETTLEMENT);
+
   const [borrowerForm, setBorrowerForm] = useState({
     name: '', phone: '', email: '', address: '', notes: '',
   });

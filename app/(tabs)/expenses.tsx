@@ -34,6 +34,7 @@ import { PhotoPicker } from '../../src/components/PhotoPicker';
 import { PhotoViewer } from '../../src/components/PhotoViewer';
 import DatePicker from '../../src/components/DatePicker';
 import DateRangeFilter from '../../src/components/DateRangeFilter';
+import { useAppSettings, FEATURE_KEYS } from '../../src/context/AppSettingsContext';
 
 type Tab = 'expenses' | 'categories';
 
@@ -75,6 +76,10 @@ export default function Expenses() {
   const [editingExpense, setEditingExpense] = useState<any>(null);
   const [categoryModal, setCategoryModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<any>(null);
+  const { isEnabled } = useAppSettings();
+  const pdfReportEnabled = isEnabled(FEATURE_KEYS.FEATURE_PDF_REPORT);
+  const receiptPhotoEnabled = isEnabled(FEATURE_KEYS.FEATURE_RECEIPT_PHOTO);
+
   const [expenseForm, setExpenseForm] = useState({
     categoryId: '' as number | string,
     amount: '',
@@ -410,6 +415,7 @@ export default function Expenses() {
               <Text style={[styles.totalValue, { color: theme.colors.danger }]}>
                 {formatCurrency(totalExpenses)}
               </Text>
+              {pdfReportEnabled && (
               <TouchableOpacity
                 style={[
                   styles.reportButton,
@@ -431,6 +437,7 @@ export default function Expenses() {
                   </View>
                 )}
               </TouchableOpacity>
+               )}
             </Card>
 
             {/* Expense list */}
@@ -444,8 +451,8 @@ export default function Expenses() {
               filteredExpenses.map((e) => (
                 <Card key={e.id} style={styles.itemCard}>
                   <View style={styles.expenseRow}>
-                    {/* Thumbnail or dot */}
-                    {e.photo_uri ? (
+                    {/* Thumbnail - only show if photos enabled */}
+                    {receiptPhotoEnabled && e.photo_uri ? (
                       <TouchableOpacity
                         onPress={() => handleViewExpensePhoto(e.photo_uri)}
                         activeOpacity={0.8}
@@ -458,6 +465,7 @@ export default function Expenses() {
                           <Text style={styles.thumbnailBadgeText}>📷</Text>
                         </View>
                       </TouchableOpacity>
+                      
                     ) : (
                       <View
                         style={[
@@ -600,6 +608,8 @@ export default function Expenses() {
                 placeholder="Optional"
               />
 
+              {/* Receipt Photo Picker - only if enabled */}
+              {receiptPhotoEnabled && (
               <PhotoPicker
                 label="Receipt Photo"
                 photoUri={expenseForm.photoUri}
@@ -608,6 +618,7 @@ export default function Expenses() {
                 onRemovePhoto={handleRemovePhoto}
                 onViewPhoto={handleViewFormPhoto}
               />
+              )}
 
               <View style={styles.modalButtons}>
                 <Button title="Cancel" variant="secondary" onPress={() => setExpenseModal(false)} />

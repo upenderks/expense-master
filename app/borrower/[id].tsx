@@ -33,6 +33,7 @@ import { Input } from '../../src/components/Input';
 import DatePicker from '../../src/components/DatePicker';
 import DateRangeFilter from '../../src/components/DateRangeFilter';
 import { HorizontalBarChart } from '../../src/components/charts/HorizontalBarChart';
+import { useAppSettings, FEATURE_KEYS } from '../../src/context/AppSettingsContext';
 
 type ViewTab = 'active' | 'settled';
 
@@ -59,6 +60,10 @@ export default function BorrowerDetail() {
   const [expandedSettlement, setExpandedSettlement] = useState<number | null>(null);
   const [settlementTxs, setSettlementTxs] = useState<any[]>([]);
   const [loadingSettlementTxs, setLoadingSettlementTxs] = useState(false);
+  const { isEnabled } = useAppSettings();
+  const settlementEnabled = isEnabled(FEATURE_KEYS.FEATURE_SETTLEMENT);
+  const chartsEnabled = isEnabled(FEATURE_KEYS.FEATURE_CHARTS);
+
   const [transactionForm, setTransactionForm] = useState({
     type: 'given' as 'given' | 'received',
     amount: '',
@@ -387,7 +392,7 @@ export default function BorrowerDetail() {
         </Card>
 
         {/* Settle Button */}
-        {canSettle && (
+        {canSettle && settlementEnabled && (
           <TouchableOpacity
             style={[
               styles.settleButton,
@@ -410,7 +415,7 @@ export default function BorrowerDetail() {
         )}
 
         {/* Chart */}
-        {(totalGiven > 0 || totalReceived > 0) && (
+         {chartsEnabled && (totalGiven > 0 || totalReceived > 0) && (
           <Card style={styles.section}>
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>📊 Given vs Received</Text>
             <HorizontalBarChart data={chartData} formatValue={formatShort} />
@@ -444,28 +449,42 @@ export default function BorrowerDetail() {
         </View>
 
         {/* View Toggle */}
+       {/* View Toggle: Active / Settled */}
         <View style={[styles.viewToggle, { backgroundColor: isDark ? '#334155' : '#e5e7eb' }]}>
-          {(['active', 'settled'] as ViewTab[]).map((tab) => (
+          <TouchableOpacity
+            style={[
+              styles.viewToggleBtn,
+              activeViewTab === 'active' && [styles.viewToggleActive, { backgroundColor: theme.colors.surface }],
+            ]}
+            onPress={() => setActiveViewTab('active')}
+          >
+            <Text style={[
+              styles.viewToggleText,
+              { color: theme.colors.muted },
+              activeViewTab === 'active' && { color: theme.colors.text, fontWeight: '600' },
+            ]}>
+              📋 Active ({transactions.length})
+            </Text>
+          </TouchableOpacity>
+
+          {/* Only show Settled tab if settlement feature is enabled */}
+          {settlementEnabled && (
             <TouchableOpacity
-              key={tab}
               style={[
                 styles.viewToggleBtn,
-                activeViewTab === tab && [
-                  styles.viewToggleActive,
-                  { backgroundColor: theme.colors.surface },
-                ],
+                activeViewTab === 'settled' && [styles.viewToggleActive, { backgroundColor: theme.colors.surface }],
               ]}
-              onPress={() => setActiveViewTab(tab)}
+              onPress={() => setActiveViewTab('settled')}
             >
               <Text style={[
                 styles.viewToggleText,
                 { color: theme.colors.muted },
-                activeViewTab === tab && { color: theme.colors.text, fontWeight: '600' },
+                activeViewTab === 'settled' && { color: theme.colors.text, fontWeight: '600' },
               ]}>
-                {tab === 'active' ? `📋 Active (${transactions.length})` : `✅ Settled (${settlements.length})`}
+                ✅ Settled ({settlements.length})
               </Text>
             </TouchableOpacity>
-          ))}
+          )}
         </View>
 
         {/* Active Transactions */}
@@ -530,7 +549,7 @@ export default function BorrowerDetail() {
         )}
 
         {/* Settlement History */}
-        {activeViewTab === 'settled' && (
+        {settlementEnabled && activeViewTab === 'settled' && (
           <Card style={styles.section}>
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
               ✅ Settlement History ({settlements.length})

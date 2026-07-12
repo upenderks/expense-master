@@ -1,9 +1,14 @@
 import { Tabs } from 'expo-router';
 import { Text } from 'react-native';
 import { useTheme } from '../../src/context/ThemeContext';
+import { useAppSettings, FEATURE_KEYS } from '../../src/context/AppSettingsContext';
 
 export default function TabLayout() {
   const { theme } = useTheme();
+  const { isEnabled } = useAppSettings();
+
+  const moneyEnabled = isEnabled(FEATURE_KEYS.MODULE_MONEY);
+  const expenseEnabled = isEnabled(FEATURE_KEYS.MODULE_EXPENSE);
 
   return (
     <Tabs
@@ -33,6 +38,7 @@ export default function TabLayout() {
         options={{
           title: 'Money',
           tabBarIcon: () => <Text style={{ fontSize: 22 }}>💰</Text>,
+          href: moneyEnabled ? '/(tabs)/money' : null,
         }}
       />
       <Tabs.Screen
@@ -40,6 +46,7 @@ export default function TabLayout() {
         options={{
           title: 'Expenses',
           tabBarIcon: () => <Text style={{ fontSize: 22 }}>💸</Text>,
+          href: expenseEnabled ? '/(tabs)/expenses' : null,
         }}
       />
       <Tabs.Screen
