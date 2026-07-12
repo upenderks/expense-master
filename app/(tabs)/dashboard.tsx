@@ -11,6 +11,8 @@ import {
 import { useFocusEffect, router } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { useTheme } from '../../src/context/ThemeContext';
+import { useLanguage } from '../../src/context/LanguageContext';
+import { useAppSettings, FEATURE_KEYS } from '../../src/context/AppSettingsContext';
 import {
   getMoneyDashboardData,
   getExpenseDashboardData,
@@ -21,7 +23,6 @@ import { DonutChart } from '../../src/components/charts/DonutChart';
 import { BarChart } from '../../src/components/charts/BarChart';
 import { HorizontalBarChart } from '../../src/components/charts/HorizontalBarChart';
 import DateRangeFilter from '../../src/components/DateRangeFilter';
-import { useAppSettings, FEATURE_KEYS } from '../../src/context/AppSettingsContext';
 
 type Module = 'money' | 'expense';
 type Period = 'day' | 'week' | 'month' | 'custom';
@@ -29,7 +30,9 @@ type Period = 'day' | 'week' | 'month' | 'custom';
 export default function Dashboard() {
   const { user } = useAuth();
   const { theme, isDark } = useTheme();
-  const { isEnabled, getSetting } = useAppSettings();
+  const { t } = useLanguage();
+  const { isEnabled } = useAppSettings();
+
   const moneyEnabled = isEnabled(FEATURE_KEYS.MODULE_MONEY);
   const expenseEnabled = isEnabled(FEATURE_KEYS.MODULE_EXPENSE);
   const chartsEnabled = isEnabled(FEATURE_KEYS.FEATURE_CHARTS);
@@ -45,7 +48,6 @@ export default function Dashboard() {
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [showDateFilter, setShowDateFilter] = useState(false);
-  
 
   const loadData = async () => {
     if (!user) return;
@@ -170,12 +172,27 @@ export default function Dashboard() {
 
   const getPeriodLabel = (): string => {
     if (expensePeriod === 'custom') {
-      if (customStartDate && customEndDate) return `${customStartDate} to ${customEndDate}`;
-      if (customStartDate) return `From ${customStartDate}`;
-      if (customEndDate) return `Until ${customEndDate}`;
-      return 'Custom';
+      if (customStartDate && customEndDate) return `${customStartDate} ${t('to')} ${customEndDate}`;
+      if (customStartDate) return `${t('from')} ${customStartDate}`;
+      if (customEndDate) return `${t('to')} ${customEndDate}`;
+      return t('custom');
     }
-    return expensePeriod;
+    switch (expensePeriod) {
+      case 'day': return t('day');
+      case 'week': return t('week');
+      case 'month': return t('month');
+      default: return expensePeriod;
+    }
+  };
+
+  const getBarChartTitle = (): string => {
+    switch (expensePeriod) {
+      case 'day': return t('todays_spending');
+      case 'week': return t('last_7_days');
+      case 'month': return t('weekly_breakdown');
+      case 'custom': return t('spending_trend');
+      default: return '';
+    }
   };
 
   if (loading) {
@@ -198,7 +215,7 @@ export default function Dashboard() {
     if (expenses.length === 0) return [];
 
     if (expensePeriod === 'day') {
-      return [{ label: 'Today', value: expenseData?.totalExpenses || 0, color: '#ef4444' }];
+      return [{ label: t('today'), value: expenseData?.totalExpenses || 0, color: '#ef4444' }];
     }
 
     if (expensePeriod === 'week') {
@@ -232,11 +249,14 @@ export default function Dashboard() {
         weekMap[label] = 0;
         expenses.forEach((e: any) => {
           const expDate = new Date(e.date);
-          if (expDate >= weekStart && expDate <= weekEnd) weekMap[label] += Number(e.amount || 0);
+          if (expDate >= weekStart && expDate <= weekEnd)
+            weekMap[label] += Number(e.amount || 0);
         });
       }
       return Object.entries(weekMap).map(([label, total]) => ({
-        label, value: total, color: total > 0 ? '#ef4444' : '#e5e7eb',
+        label,
+        value: total,
+        color: total > 0 ? '#ef4444' : '#e5e7eb',
       }));
     }
 
@@ -245,7 +265,9 @@ export default function Dashboard() {
       const dates = expenses.map((e: any) => new Date(e.date));
       const minDate = new Date(Math.min(...dates.map((d: Date) => d.getTime())));
       const maxDate = new Date(Math.max(...dates.map((d: Date) => d.getTime())));
-      const diffDays = Math.ceil((maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24));
+      const diffDays = Math.ceil(
+        (maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24)
+      );
 
       if (diffDays > 60) {
         const monthMap: Record<string, number> = {};
@@ -255,10 +277,17 @@ export default function Dashboard() {
           monthMap[key] = (monthMap[key] || 0) + Number(e.amount || 0);
         });
         const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-        return Object.entries(monthMap).sort(([a], [b]) => a.localeCompare(b)).slice(-8).map(([key, total]) => {
-          const [, mo] = key.split('-');
-          return { label: monthNames[parseInt(mo) - 1], value: total, color: total > 0 ? '#ef4444' : '#e5e7eb' };
-        });
+        return Object.entries(monthMap)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .slice(-8)
+          .map(([key, total]) => {
+            const [, mo] = key.split('-');
+            return {
+              label: monthNames[parseInt(mo) - 1],
+              value: total,
+              color: total > 0 ? '#ef4444' : '#e5e7eb',
+            };
+          });
       }
 
       if (diffDays > 14) {
@@ -272,33 +301,41 @@ export default function Dashboard() {
           weekMap[label] = 0;
           expenses.forEach((e: any) => {
             const expDate = new Date(e.date);
-            if (expDate >= weekStart && expDate <= weekEnd) weekMap[label] += Number(e.amount || 0);
+            if (expDate >= weekStart && expDate <= weekEnd)
+              weekMap[label] += Number(e.amount || 0);
           });
           weekStart.setDate(weekStart.getDate() + 7);
           weekNum++;
         }
-        return Object.entries(weekMap).slice(-8).map(([label, total]) => ({
-          label, value: total, color: total > 0 ? '#ef4444' : '#e5e7eb',
-        }));
+        return Object.entries(weekMap)
+          .slice(-8)
+          .map(([label, total]) => ({
+            label,
+            value: total,
+            color: total > 0 ? '#ef4444' : '#e5e7eb',
+          }));
       }
 
       const dayMap: Record<string, number> = {};
       expenses.forEach((e: any) => {
         dayMap[e.date] = (dayMap[e.date] || 0) + Number(e.amount || 0);
       });
-      return Object.entries(dayMap).sort(([a], [b]) => a.localeCompare(b)).slice(-10).map(([date, total]) => ({
-        label: `${new Date(date).getDate()}/${new Date(date).getMonth() + 1}`,
-        value: total,
-        color: total > 0 ? '#ef4444' : '#e5e7eb',
-      }));
+      return Object.entries(dayMap)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .slice(-10)
+        .map(([date, total]) => ({
+          label: `${new Date(date).getDate()}/${new Date(date).getMonth() + 1}`,
+          value: total,
+          color: total > 0 ? '#ef4444' : '#e5e7eb',
+        }));
     }
     return [];
   })();
 
   const moneyComparisonData = moneyData
     ? [
-        { label: 'Given', value: moneyData.totalGiven, color: '#dc2626' },
-        { label: 'Received', value: moneyData.totalReceived, color: '#059669' },
+        { label: t('given'), value: moneyData.totalGiven, color: '#dc2626' },
+        { label: t('received'), value: moneyData.totalReceived, color: '#059669' },
       ]
     : [];
 
@@ -311,16 +348,6 @@ export default function Dashboard() {
         value: b.balance,
         color: b.balance > 0 ? '#059669' : '#dc2626',
       })) || [];
-
-  const getBarChartTitle = (): string => {
-    switch (expensePeriod) {
-      case 'day': return "Today's Spending";
-      case 'week': return 'Last 7 Days';
-      case 'month': return 'Weekly Breakdown';
-      case 'custom': return 'Spending Trend';
-      default: return '';
-    }
-  };
 
   // ── Render ──────────────────────────────────────────────────────────
 
@@ -337,7 +364,7 @@ export default function Dashboard() {
     >
       {/* Greeting */}
       <Text style={[styles.greeting, { color: theme.colors.text }]}>
-        Hello, {user?.name}! 👋
+        {t('hello')}, {user?.name}! 👋
       </Text>
 
       {/* Module Toggle - only show if both modules enabled */}
@@ -364,9 +391,12 @@ export default function Dashboard() {
               <Text style={[
                 styles.moduleText,
                 { color: theme.colors.muted },
-                activeModule === m && { color: theme.colors.text, fontWeight: '600' },
+                activeModule === m && {
+                  color: theme.colors.text,
+                  fontWeight: '600',
+                },
               ]}>
-                {m.charAt(0).toUpperCase() + m.slice(1)}
+                {m === 'expense' ? t('expense') : t('money')}
               </Text>
             </TouchableOpacity>
           ))}
@@ -402,7 +432,10 @@ export default function Dashboard() {
                   },
                 ]}>
                   {p === 'custom' ? '📅 ' : ''}
-                  {p.charAt(0).toUpperCase() + p.slice(1)}
+                  {p === 'day' ? t('day')
+                    : p === 'week' ? t('week')
+                    : p === 'month' ? t('month')
+                    : t('custom')}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -416,7 +449,7 @@ export default function Dashboard() {
                 endDate={customEndDate}
                 onChange={handleDateFilterChange}
                 onClear={handleClearDateFilter}
-                title="📅 Custom Date Range"
+                title={`📅 ${t('custom_date_range')}`}
               />
             </View>
           )}
@@ -427,18 +460,22 @@ export default function Dashboard() {
             { backgroundColor: isDark ? theme.colors.dangerSoft : '#fef2f2' },
           ]}>
             <Text style={[styles.totalLabel, { color: theme.colors.muted }]}>
-              Total Expenses ({getPeriodLabel()})
+              {t('total_expenses')} ({getPeriodLabel()})
             </Text>
             <Text style={[styles.totalValue, { color: theme.colors.danger }]}>
               {formatCurrency(expenseData.totalExpenses)}
             </Text>
             <View style={[
               styles.totalMeta,
-              { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' },
+              {
+                backgroundColor: isDark
+                  ? 'rgba(255,255,255,0.05)'
+                  : 'rgba(0,0,0,0.04)',
+              },
             ]}>
               <View style={styles.totalMetaItem}>
                 <Text style={[styles.totalMetaLabel, { color: theme.colors.muted }]}>
-                  Categories
+                  {t('categories')}
                 </Text>
                 <Text style={[styles.totalMetaValue, { color: theme.colors.text }]}>
                   {expenseData.categoryTotals.filter((c: any) => c.total > 0).length}
@@ -447,26 +484,28 @@ export default function Dashboard() {
               <View style={[styles.totalMetaDivider, { backgroundColor: theme.colors.border }]} />
               <View style={styles.totalMetaItem}>
                 <Text style={[styles.totalMetaLabel, { color: theme.colors.muted }]}>
-                  Transactions
+                  {t('transactions')}
                 </Text>
                 <Text style={[styles.totalMetaValue, { color: theme.colors.text }]}>
-                  {expenseData.allFilteredExpenses?.length || expenseData.recentExpenses?.length || 0}
+                  {expenseData.allFilteredExpenses?.length ||
+                    expenseData.recentExpenses?.length ||
+                    0}
                 </Text>
               </View>
             </View>
           </Card>
 
-         {/* Donut Chart */}
+          {/* Donut Chart */}
           {chartsEnabled && (
             <Card style={styles.section}>
               <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-                🥧 Category Breakdown
+                🥧 {t('category_breakdown')}
               </Text>
               <DonutChart
                 data={expenseDonutData}
                 size={190}
                 strokeWidth={30}
-                centerLabel="Total"
+                centerLabel={t('total')}
                 centerValue={formatShort(expenseData.totalExpenses)}
               />
             </Card>
@@ -490,24 +529,27 @@ export default function Dashboard() {
           {/* Category Progress */}
           <Card style={styles.section}>
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-              🏷️ By Category
+              🏷️ {t('by_category')}
             </Text>
             {expenseData.categoryTotals.filter((c: any) => c.total > 0).length === 0 ? (
               <Text style={[styles.emptyText, { color: theme.colors.muted }]}>
-                No expenses in this period
+                {t('no_expenses_period')}
               </Text>
             ) : (
               expenseData.categoryTotals
                 .filter((c: any) => c.total > 0)
                 .sort((a: any, b: any) => b.total - a.total)
                 .map((cat: any) => {
-                  const pct = expenseData.totalExpenses > 0
-                    ? (cat.total / expenseData.totalExpenses) * 100
-                    : 0;
+                  const pct =
+                    expenseData.totalExpenses > 0
+                      ? (cat.total / expenseData.totalExpenses) * 100
+                      : 0;
                   return (
                     <View key={cat.id} style={styles.categoryRow}>
                       <View style={styles.categoryHeader}>
-                        <View style={[styles.categoryDot, { backgroundColor: cat.color }]} />
+                        <View
+                          style={[styles.categoryDot, { backgroundColor: cat.color }]}
+                        />
                         <Text style={[styles.categoryName, { color: theme.colors.text }]}>
                           {cat.name}
                         </Text>
@@ -537,17 +579,17 @@ export default function Dashboard() {
           <Card style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-                📋 Recent Expenses
+                📋 {t('recent_expenses')}
               </Text>
               <TouchableOpacity onPress={() => router.push('/(tabs)/expenses')}>
                 <Text style={[styles.viewAll, { color: theme.colors.primary }]}>
-                  View All →
+                  {t('view_all')} →
                 </Text>
               </TouchableOpacity>
             </View>
             {expenseData.recentExpenses.length === 0 ? (
               <Text style={[styles.emptyText, { color: theme.colors.muted }]}>
-                No expenses yet
+                {t('no_expenses_yet')}
               </Text>
             ) : (
               expenseData.recentExpenses.slice(0, 5).map((e: any) => (
@@ -555,7 +597,10 @@ export default function Dashboard() {
                   key={e.id}
                   style={[styles.expenseRow, { borderBottomColor: theme.colors.border }]}
                 >
-                  <View style={[styles.categoryDotSmall, { backgroundColor: e.category_color }]} />
+                  <View style={[
+                    styles.categoryDotSmall,
+                    { backgroundColor: e.category_color },
+                  ]} />
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.expenseCategory, { color: theme.colors.text }]}>
                       {e.category_name}
@@ -580,10 +625,39 @@ export default function Dashboard() {
           {/* Stats Grid */}
           <View style={styles.statsGrid}>
             {[
-              { emoji: '💸', label: 'Total Given', value: formatCurrency(moneyData.totalGiven), color: '#dc2626', bg: isDark ? '#450a0a' : '#ecfdf5' },
-              { emoji: '💰', label: 'Total Received', value: formatCurrency(moneyData.totalReceived), color: '#059669', bg: isDark ? '#064e3b' : '#eff6ff' },
-              { emoji: '📊', label: 'Outstanding', value: formatCurrency(Math.abs(moneyData.outstanding)), color: moneyData.outstanding > 0 ? '#dc2626' : moneyData.outstanding < 0 ? '#059669' : theme.colors.muted, bg: isDark ? '#451a03' : '#fff7ed' },
-              { emoji: '👥', label: 'Borrowers', value: String(moneyData.borrowerCount), color: theme.colors.text, bg: isDark ? '#2e1065' : '#f3e8ff' },
+              {
+                emoji: '💸',
+                label: t('total_given'),
+                value: formatCurrency(moneyData.totalGiven),
+                color: '#dc2626',
+                bg: isDark ? '#450a0a' : '#ecfdf5',
+              },
+              {
+                emoji: '💰',
+                label: t('total_received'),
+                value: formatCurrency(moneyData.totalReceived),
+                color: '#059669',
+                bg: isDark ? '#064e3b' : '#eff6ff',
+              },
+              {
+                emoji: '📊',
+                label: t('outstanding'),
+                value: formatCurrency(Math.abs(moneyData.outstanding)),
+                color:
+                  moneyData.outstanding > 0
+                    ? '#dc2626'
+                    : moneyData.outstanding < 0
+                    ? '#059669'
+                    : theme.colors.muted,
+                bg: isDark ? '#451a03' : '#fff7ed',
+              },
+              {
+                emoji: '👥',
+                label: t('borrowers'),
+                value: String(moneyData.borrowerCount),
+                color: theme.colors.text,
+                bg: isDark ? '#2e1065' : '#f3e8ff',
+              },
             ].map((item, i) => (
               <Card key={i} style={[styles.statCard, { backgroundColor: item.bg }]}>
                 <Text style={styles.statEmoji}>{item.emoji}</Text>
@@ -599,71 +673,85 @@ export default function Dashboard() {
 
           {/* Given vs Received */}
           {chartsEnabled && (
-          <Card style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-              📊 Given vs Received
-            </Text>
-            <HorizontalBarChart data={moneyComparisonData} formatValue={formatShort} />
-            <View style={styles.comparisonSummary}>
-              <View style={[
-                styles.comparisonBadge,
-                {
-                  backgroundColor: moneyData.outstanding > 0
-                    ? isDark ? '#450a0a' : '#fef2f2'
-                    : moneyData.outstanding < 0
-                    ? isDark ? '#064e3b' : '#ecfdf5'
-                    : isDark ? '#1e293b' : '#f9fafb',
-                },
-              ]}>
-                <Text style={[styles.comparisonBadgeLabel, { color: theme.colors.muted }]}>
-                  {moneyData.outstanding > 0 ? 'To Receive' : moneyData.outstanding < 0 ? 'To Pay' : 'Settled'}
-                </Text>
-                <Text style={[
-                  styles.comparisonBadgeValue,
+            <Card style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                📊 {t('given_vs_received')}
+              </Text>
+              <HorizontalBarChart
+                data={moneyComparisonData}
+                formatValue={formatShort}
+              />
+              <View style={styles.comparisonSummary}>
+                <View style={[
+                  styles.comparisonBadge,
                   {
-                    color: moneyData.outstanding > 0 ? '#dc2626'
-                      : moneyData.outstanding < 0 ? '#059669'
-                      : theme.colors.muted,
+                    backgroundColor:
+                      moneyData.outstanding > 0
+                        ? isDark ? '#450a0a' : '#fef2f2'
+                        : moneyData.outstanding < 0
+                        ? isDark ? '#064e3b' : '#ecfdf5'
+                        : isDark ? '#1e293b' : '#f9fafb',
                   },
                 ]}>
-                  {formatCurrency(Math.abs(moneyData.outstanding))}
-                </Text>
+                  <Text style={[styles.comparisonBadgeLabel, { color: theme.colors.muted }]}>
+                    {moneyData.outstanding > 0
+                      ? t('to_receive')
+                      : moneyData.outstanding < 0
+                      ? t('to_pay')
+                      : t('settled')}
+                  </Text>
+                  <Text style={[
+                    styles.comparisonBadgeValue,
+                    {
+                      color:
+                        moneyData.outstanding > 0
+                          ? '#dc2626'
+                          : moneyData.outstanding < 0
+                          ? '#059669'
+                          : theme.colors.muted,
+                    },
+                  ]}>
+                    {formatCurrency(Math.abs(moneyData.outstanding))}
+                  </Text>
+                </View>
               </View>
-            </View>
-          </Card>
+            </Card>
           )}
 
           {/* Borrower Balances Chart */}
           {chartsEnabled && (
-          <Card style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-              👥 Borrower Balances
-            </Text>
-            {borrowerChartData.length === 0 ? (
-              <Text style={[styles.emptyText, { color: theme.colors.muted }]}>
-                No outstanding balances
+            <Card style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                👥 {t('borrower_balances')}
               </Text>
-            ) : (
-              <HorizontalBarChart data={borrowerChartData} formatValue={formatShort} />
-            )}
-          </Card>
+              {borrowerChartData.length === 0 ? (
+                <Text style={[styles.emptyText, { color: theme.colors.muted }]}>
+                  {t('no_outstanding')}
+                </Text>
+              ) : (
+                <HorizontalBarChart
+                  data={borrowerChartData}
+                  formatValue={formatShort}
+                />
+              )}
+            </Card>
           )}
 
           {/* Borrower List */}
           <Card style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-                📋 Borrower Details
+                📋 {t('borrower_details')}
               </Text>
               <TouchableOpacity onPress={() => router.push('/(tabs)/money')}>
                 <Text style={[styles.viewAll, { color: theme.colors.primary }]}>
-                  View All →
+                  {t('view_all')} →
                 </Text>
               </TouchableOpacity>
             </View>
             {moneyData.borrowerBalances.length === 0 ? (
               <Text style={[styles.emptyText, { color: theme.colors.muted }]}>
-                No borrowers yet
+                {t('no_borrowers_yet')}
               </Text>
             ) : (
               moneyData.borrowerBalances.slice(0, 5).map((b: any) => (
@@ -671,7 +759,10 @@ export default function Dashboard() {
                   key={b.id}
                   style={[styles.borrowerRow, { borderBottomColor: theme.colors.border }]}
                 >
-                  <View style={[styles.borrowerAvatar, { backgroundColor: theme.colors.primary }]}>
+                  <View style={[
+                    styles.borrowerAvatar,
+                    { backgroundColor: theme.colors.primary },
+                  ]}>
                     <Text style={styles.borrowerAvatarText}>
                       {b.name.charAt(0).toUpperCase()}
                     </Text>
@@ -689,19 +780,27 @@ export default function Dashboard() {
                   <View style={styles.borrowerBalanceContainer}>
                     <Text style={[
                       styles.borrowerBalance,
-                      b.balance > 0 ? styles.positive
-                        : b.balance < 0 ? styles.negative
+                      b.balance > 0
+                        ? styles.positive
+                        : b.balance < 0
+                        ? styles.negative
                         : { color: theme.colors.muted },
                     ]}>
                       {formatCurrency(Math.abs(b.balance))}
                     </Text>
                     <Text style={[
                       styles.borrowerBalanceLabel,
-                      b.balance > 0 ? styles.positive
-                        : b.balance < 0 ? styles.negative
+                      b.balance > 0
+                        ? styles.positive
+                        : b.balance < 0
+                        ? styles.negative
                         : { color: theme.colors.muted },
                     ]}>
-                      {b.balance > 0 ? 'Owes you' : b.balance < 0 ? 'You owe' : 'Settled'}
+                      {b.balance > 0
+                        ? t('owes_you')
+                        : b.balance < 0
+                        ? t('you_owe')
+                        : t('settled')}
                     </Text>
                   </View>
                 </View>
@@ -713,49 +812,50 @@ export default function Dashboard() {
           <Card style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-                🔄 Recent Transactions
+                🔄 {t('recent_transactions')}
               </Text>
               <TouchableOpacity onPress={() => router.push('/(tabs)/money')}>
                 <Text style={[styles.viewAll, { color: theme.colors.primary }]}>
-                  View All →
+                  {t('view_all')} →
                 </Text>
               </TouchableOpacity>
             </View>
             {moneyData.recentTransactions.length === 0 ? (
               <Text style={[styles.emptyText, { color: theme.colors.muted }]}>
-                No transactions yet
+                {t('no_transactions_yet')}
               </Text>
             ) : (
-              moneyData.recentTransactions.map((t: any) => (
+              moneyData.recentTransactions.map((tx: any) => (
                 <View
-                  key={t.id}
+                  key={tx.id}
                   style={[styles.transactionRow, { borderBottomColor: theme.colors.border }]}
                 >
                   <View style={[
                     styles.transactionIcon,
                     {
-                      backgroundColor: t.type === 'given'
-                        ? isDark ? '#450a0a' : '#fef2f2'
-                        : isDark ? '#064e3b' : '#ecfdf5',
+                      backgroundColor:
+                        tx.type === 'given'
+                          ? isDark ? '#450a0a' : '#fef2f2'
+                          : isDark ? '#064e3b' : '#ecfdf5',
                     },
                   ]}>
                     <Text style={styles.transactionIconText}>
-                      {t.type === 'given' ? '↗️' : '↙️'}
+                      {tx.type === 'given' ? '↗️' : '↙️'}
                     </Text>
                   </View>
                   <View style={{ flex: 1, marginLeft: 10 }}>
                     <Text style={[styles.transactionName, { color: theme.colors.text }]}>
-                      {t.borrower_name}
+                      {tx.borrower_name}
                     </Text>
                     <Text style={[styles.transactionDate, { color: theme.colors.muted }]}>
-                      {t.date}
+                      {tx.date}
                     </Text>
                   </View>
                   <Text style={[
                     styles.transactionAmount,
-                    t.type === 'given' ? styles.negative : styles.positive,
+                    tx.type === 'given' ? styles.negative : styles.positive,
                   ]}>
-                    {t.type === 'given' ? '-' : '+'}{formatCurrency(t.amount)}
+                    {tx.type === 'given' ? '-' : '+'}{formatCurrency(tx.amount)}
                   </Text>
                 </View>
               ))
@@ -775,23 +875,64 @@ const styles = StyleSheet.create({
   greeting: { fontSize: 24, fontWeight: 'bold', marginBottom: 16 },
 
   // Module toggle
-  moduleToggle: { flexDirection: 'row', borderRadius: 12, padding: 4, marginBottom: 20 },
-  moduleButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 8, gap: 6 },
-  activeModule: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
+  moduleToggle: {
+    flexDirection: 'row',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 20,
+  },
+  moduleButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 6,
+  },
+  activeModule: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
   moduleEmoji: { fontSize: 20 },
   moduleText: { fontSize: 14, fontWeight: '500' },
 
   // Period toggle
-  periodToggle: { flexDirection: 'row', borderRadius: 8, padding: 4, marginBottom: 16 },
-  periodButton: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 6 },
-  activePeriod: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 },
+  periodToggle: {
+    flexDirection: 'row',
+    borderRadius: 8,
+    padding: 4,
+    marginBottom: 16,
+  },
+  periodButton: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 6,
+  },
+  activePeriod: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
   periodText: { fontSize: 12, fontWeight: '500' },
 
   // Total card
   totalCard: { marginBottom: 16, alignItems: 'center', paddingVertical: 20 },
   totalLabel: { fontSize: 12, marginBottom: 4 },
   totalValue: { fontSize: 32, fontWeight: '800' },
-  totalMeta: { flexDirection: 'row', marginTop: 14, borderRadius: 12, paddingVertical: 8, paddingHorizontal: 20 },
+  totalMeta: {
+    flexDirection: 'row',
+    marginTop: 14,
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+  },
   totalMetaItem: { alignItems: 'center', paddingHorizontal: 16 },
   totalMetaLabel: { fontSize: 11 },
   totalMetaValue: { fontSize: 16, fontWeight: '700', marginTop: 2 },
@@ -806,14 +947,24 @@ const styles = StyleSheet.create({
 
   // Section
   section: { marginBottom: 16 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   sectionTitle: { fontSize: 16, fontWeight: '600', marginBottom: 16 },
   viewAll: { fontSize: 14, fontWeight: '500' },
   emptyText: { textAlign: 'center', paddingVertical: 20 },
 
   // Comparison
   comparisonSummary: { alignItems: 'center', marginTop: 14 },
-  comparisonBadge: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, alignItems: 'center' },
+  comparisonBadge: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
   comparisonBadgeLabel: { fontSize: 11 },
   comparisonBadgeValue: { fontSize: 20, fontWeight: '800', marginTop: 2 },
 
@@ -829,8 +980,19 @@ const styles = StyleSheet.create({
   progressFill: { height: '100%', borderRadius: 4 },
 
   // Borrower rows
-  borrowerRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1 },
-  borrowerAvatar: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+  borrowerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  borrowerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   borrowerAvatarText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   borrowerInfo: { flex: 1, marginLeft: 12 },
   borrowerName: { fontSize: 14, fontWeight: '500' },
@@ -844,15 +1006,31 @@ const styles = StyleSheet.create({
   neutral: { color: '#6b7280' },
 
   // Transaction rows
-  transactionRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1 },
-  transactionIcon: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
+  transactionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  transactionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   transactionIconText: { fontSize: 16 },
   transactionName: { fontSize: 14, fontWeight: '500' },
   transactionDate: { fontSize: 12, marginTop: 2 },
   transactionAmount: { fontSize: 15, fontWeight: '700' },
 
   // Expense rows
-  expenseRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1 },
+  expenseRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
   expenseCategory: { fontSize: 14, fontWeight: '500' },
   expenseDate: { fontSize: 12, marginTop: 2 },
   expenseAmount: { fontSize: 15, fontWeight: '600' },

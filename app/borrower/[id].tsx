@@ -14,6 +14,8 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { useTheme } from '../../src/context/ThemeContext';
+import { useLanguage } from '../../src/context/LanguageContext';
+import { useAppSettings, FEATURE_KEYS } from '../../src/context/AppSettingsContext';
 import {
   getBorrowers,
   getTransactions,
@@ -33,7 +35,6 @@ import { Input } from '../../src/components/Input';
 import DatePicker from '../../src/components/DatePicker';
 import DateRangeFilter from '../../src/components/DateRangeFilter';
 import { HorizontalBarChart } from '../../src/components/charts/HorizontalBarChart';
-import { useAppSettings, FEATURE_KEYS } from '../../src/context/AppSettingsContext';
 
 type ViewTab = 'active' | 'settled';
 
@@ -41,7 +42,12 @@ export default function BorrowerDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
   const { theme, isDark } = useTheme();
+  const { t } = useLanguage();
+  const { isEnabled } = useAppSettings();
   const borrowerId = Number(id);
+
+  const settlementEnabled = isEnabled(FEATURE_KEYS.FEATURE_SETTLEMENT);
+  const chartsEnabled = isEnabled(FEATURE_KEYS.FEATURE_CHARTS);
 
   const [borrower, setBorrower] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -60,10 +66,6 @@ export default function BorrowerDetail() {
   const [expandedSettlement, setExpandedSettlement] = useState<number | null>(null);
   const [settlementTxs, setSettlementTxs] = useState<any[]>([]);
   const [loadingSettlementTxs, setLoadingSettlementTxs] = useState(false);
-  const { isEnabled } = useAppSettings();
-  const settlementEnabled = isEnabled(FEATURE_KEYS.FEATURE_SETTLEMENT);
-  const chartsEnabled = isEnabled(FEATURE_KEYS.FEATURE_CHARTS);
-
   const [transactionForm, setTransactionForm] = useState({
     type: 'given' as 'given' | 'received',
     amount: '',
@@ -113,8 +115,10 @@ export default function BorrowerDetail() {
     if (transaction) {
       setEditingTransaction(transaction);
       setTransactionForm({
-        type: transaction.type, amount: String(transaction.amount),
-        date: transaction.date, description: transaction.description || '',
+        type: transaction.type,
+        amount: String(transaction.amount),
+        date: transaction.date,
+        description: transaction.description || '',
       });
     } else {
       setEditingTransaction(null);
@@ -127,27 +131,44 @@ export default function BorrowerDetail() {
   };
 
   const handleSaveTransaction = async () => {
-    if (!transactionForm.amount) { Alert.alert('Error', 'Please enter amount'); return; }
+    if (!transactionForm.amount) {
+      Alert.alert(t('error'), t('enter_amount'));
+      return;
+    }
     setSaving(true);
     try {
       if (editingTransaction) {
-        await updateTransaction(editingTransaction.id, user!.id, borrowerId, transactionForm.type, parseFloat(transactionForm.amount), transactionForm.date, transactionForm.description);
+        await updateTransaction(
+          editingTransaction.id, user!.id, borrowerId,
+          transactionForm.type, parseFloat(transactionForm.amount),
+          transactionForm.date, transactionForm.description
+        );
       } else {
-        await createTransaction(user!.id, borrowerId, transactionForm.type, parseFloat(transactionForm.amount), transactionForm.date, transactionForm.description);
+        await createTransaction(
+          user!.id, borrowerId, transactionForm.type,
+          parseFloat(transactionForm.amount),
+          transactionForm.date, transactionForm.description
+        );
       }
       setTransactionModal(false);
       await loadData();
     } catch (error) {
-      Alert.alert('Error', (error as Error).message);
+      Alert.alert(t('error'), (error as Error).message);
     } finally {
       setSaving(false);
     }
   };
 
   const handleDeleteTransaction = (txId: number) => {
-    Alert.alert('Delete Transaction', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => { await deleteTransaction(txId, user!.id); await loadData(); } },
+    Alert.alert(t('delete_transaction'), t('are_you_sure'), [
+      { text: t('cancel'), style: 'cancel' },
+      {
+        text: t('delete'), style: 'destructive',
+        onPress: async () => {
+          await deleteTransaction(txId, user!.id);
+          await loadData();
+        },
+      },
     ]);
   };
 
@@ -160,26 +181,31 @@ export default function BorrowerDetail() {
     try {
       await settleBorrower(user!.id, borrowerId, settleNotes);
       setSettleModal(false);
-      Alert.alert('✅ Account Settled', `All transactions with ${borrower?.name} have been settled.`);
+      Alert.alert(
+        `✅ ${t('account_settled')}`,
+        t('all_transactions_settled')
+      );
       await loadData();
     } catch (error) {
-      Alert.alert('Error', (error as Error).message);
+      Alert.alert(t('error'), (error as Error).message);
     } finally {
       setSettleSaving(false);
     }
   };
 
   const handleUndoSettlement = (settlementId: number) => {
-    Alert.alert('Undo Settlement', 'This will restore all transactions back to active. Continue?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('undo_settlement'), t('undo_settlement_confirm'), [
+      { text: t('cancel'), style: 'cancel' },
       {
-        text: 'Undo', style: 'destructive',
+        text: t('undo'), style: 'destructive',
         onPress: async () => {
           try {
             await deleteSettlement(settlementId, user!.id);
             await loadData();
-            Alert.alert('✅ Settlement Undone', 'Transactions restored.');
-          } catch (error) { Alert.alert('Error', (error as Error).message); }
+            Alert.alert(`✅ ${t('undo_settlement')}`, t('settlement_undone'));
+          } catch (error) {
+            Alert.alert(t('error'), (error as Error).message);
+          }
         },
       },
     ]);
@@ -187,51 +213,88 @@ export default function BorrowerDetail() {
 
   const handleToggleSettlement = async (settlement: any) => {
     if (expandedSettlement === settlement.id) {
-      setExpandedSettlement(null); setSettlementTxs([]); return;
+      setExpandedSettlement(null);
+      setSettlementTxs([]);
+      return;
     }
     setExpandedSettlement(settlement.id);
     setLoadingSettlementTxs(true);
     try {
-      const txs = await getSettlementTransactions(user!.id, borrowerId, settlement.settled_at);
+      const txs = await getSettlementTransactions(
+        user!.id, borrowerId, settlement.settled_at
+      );
       setSettlementTxs(txs);
-    } catch (error) { setSettlementTxs([]); }
-    finally { setLoadingSettlementTxs(false); }
+    } catch (error) {
+      setSettlementTxs([]);
+    } finally {
+      setLoadingSettlementTxs(false);
+    }
   };
 
   // ── Borrower handlers ──────────────────────────────────────────────
 
   const openEditBorrower = () => {
     if (!borrower) return;
-    setBorrowerForm({ name: borrower.name, phone: borrower.phone || '', email: borrower.email || '', address: borrower.address || '', notes: borrower.notes || '' });
+    setBorrowerForm({
+      name: borrower.name, phone: borrower.phone || '',
+      email: borrower.email || '', address: borrower.address || '',
+      notes: borrower.notes || '',
+    });
     setEditBorrowerModal(true);
   };
 
   const handleSaveBorrower = async () => {
-    if (!borrowerForm.name.trim()) { Alert.alert('Error', 'Name is required'); return; }
+    if (!borrowerForm.name.trim()) {
+      Alert.alert(t('error'), t('name_required'));
+      return;
+    }
     setSaving(true);
     try {
-      await updateBorrower(borrowerId, user!.id, borrowerForm.name.trim(), borrowerForm.phone, borrowerForm.email, borrowerForm.address, borrowerForm.notes);
+      await updateBorrower(
+        borrowerId, user!.id, borrowerForm.name.trim(),
+        borrowerForm.phone, borrowerForm.email,
+        borrowerForm.address, borrowerForm.notes
+      );
       setEditBorrowerModal(false);
       await loadData();
-    } catch (error) { Alert.alert('Error', (error as Error).message); }
-    finally { setSaving(false); }
+    } catch (error) {
+      Alert.alert(t('error'), (error as Error).message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDeleteBorrower = () => {
-    Alert.alert('Delete Borrower', `Delete ${borrower?.name}? This will remove all transactions and settlements.`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => { await deleteBorrower(borrowerId, user!.id); router.back(); } },
-    ]);
+    Alert.alert(
+      t('delete_borrower'),
+      `${borrower?.name}? ${t('delete_borrower_full')}`,
+      [
+        { text: t('cancel'), style: 'cancel' },
+        {
+          text: t('delete'), style: 'destructive',
+          onPress: async () => {
+            await deleteBorrower(borrowerId, user!.id);
+            router.back();
+          },
+        },
+      ]
+    );
   };
 
-  const handleCall = () => { if (borrower?.phone) Linking.openURL(`tel:${borrower.phone}`); };
+  const handleCall = () => {
+    if (borrower?.phone) Linking.openURL(`tel:${borrower.phone}`);
+  };
   const handleWhatsApp = () => {
     if (borrower?.phone) {
       const phone = borrower.phone.replace(/[^0-9]/g, '');
-      Linking.openURL(`whatsapp://send?phone=${phone}&text=${encodeURIComponent(`Hi ${borrower.name}`)}`);
+      Linking.openURL(
+        `whatsapp://send?phone=${phone}&text=${encodeURIComponent(`Hi ${borrower.name}`)}`
+      );
     }
   };
-  const handleEmail = () => { if (borrower?.email) Linking.openURL(`mailto:${borrower.email}`); };
+  const handleEmail = () => {
+    if (borrower?.email) Linking.openURL(`mailto:${borrower.email}`);
+  };
 
   // ── Formatting ─────────────────────────────────────────────────────
 
@@ -246,16 +309,23 @@ export default function BorrowerDetail() {
 
   const formatDateTime = (dateStr: string) => {
     try {
-      return new Date(dateStr).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+      return new Date(dateStr).toLocaleDateString('en-IN', {
+        day: '2-digit', month: 'short', year: 'numeric',
+      });
     } catch { return dateStr; }
   };
 
-  const totalGiven = transactions.filter(t => t.type === 'given').reduce((s, t) => s + Number(t.amount || 0), 0);
-  const totalReceived = transactions.filter(t => t.type === 'received').reduce((s, t) => s + Number(t.amount || 0), 0);
+  const totalGiven = transactions
+    .filter((tx) => tx.type === 'given')
+    .reduce((s, tx) => s + Number(tx.amount || 0), 0);
+  const totalReceived = transactions
+    .filter((tx) => tx.type === 'received')
+    .reduce((s, tx) => s + Number(tx.amount || 0), 0);
   const outstanding = totalGiven - totalReceived;
+
   const chartData = [
-    { label: 'Given', value: totalGiven, color: '#dc2626' },
-    { label: 'Received', value: totalReceived, color: '#059669' },
+    { label: t('given'), value: totalGiven, color: '#dc2626' },
+    { label: t('received'), value: totalReceived, color: '#059669' },
   ];
   const canSettle = transactions.length > 0;
 
@@ -264,7 +334,9 @@ export default function BorrowerDetail() {
   if (loading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
-        <Text style={[styles.loadingText, { color: theme.colors.muted }]}>Loading...</Text>
+        <Text style={[styles.loadingText, { color: theme.colors.muted }]}>
+          {t('loading')}
+        </Text>
       </View>
     );
   }
@@ -272,8 +344,14 @@ export default function BorrowerDetail() {
   if (!borrower) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
-        <Text style={[styles.loadingText, { color: theme.colors.muted }]}>Borrower not found</Text>
-        <Button title="Go Back" onPress={() => router.back()} style={{ marginTop: 16 }} />
+        <Text style={[styles.loadingText, { color: theme.colors.muted }]}>
+          Borrower not found
+        </Text>
+        <Button
+          title={t('back')}
+          onPress={() => router.back()}
+          style={{ marginTop: 16 }}
+        />
       </View>
     );
   }
@@ -286,36 +364,61 @@ export default function BorrowerDetail() {
       {/* Header */}
       <View style={[
         styles.header,
-        {
-          backgroundColor: theme.colors.surface,
-          borderBottomColor: theme.colors.border,
-        },
+        { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.border },
       ]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={[styles.backBtnText, { color: theme.colors.primary }]}>← Back</Text>
+          <Text style={[styles.backBtnText, { color: theme.colors.primary }]}>
+            ← {t('back')}
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={openEditBorrower}>
-          <Text style={[styles.editHeaderBtn, { color: theme.colors.primary }]}>✏️ Edit</Text>
+          <Text style={[styles.editHeaderBtn, { color: theme.colors.primary }]}>
+            ✏️ {t('edit')}
+          </Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={theme.colors.primary}
+          />
         }
       >
         {/* Profile Card */}
         <Card style={styles.profileCard}>
           <View style={styles.profileRow}>
             <View style={[styles.avatar, { backgroundColor: theme.colors.primary }]}>
-              <Text style={styles.avatarText}>{borrower.name.charAt(0).toUpperCase()}</Text>
+              <Text style={styles.avatarText}>
+                {borrower.name.charAt(0).toUpperCase()}
+              </Text>
             </View>
             <View style={styles.profileInfo}>
-              <Text style={[styles.profileName, { color: theme.colors.text }]}>{borrower.name}</Text>
-              {borrower.phone && <Text style={[styles.profileMeta, { color: theme.colors.muted }]}>📞 {borrower.phone}</Text>}
-              {borrower.email && <Text style={[styles.profileMeta, { color: theme.colors.muted }]}>✉️ {borrower.email}</Text>}
-              {borrower.address && <Text style={[styles.profileMeta, { color: theme.colors.muted }]}>📍 {borrower.address}</Text>}
-              {borrower.notes && <Text style={[styles.profileNotes, { color: theme.colors.muted }]}>📝 {borrower.notes}</Text>}
+              <Text style={[styles.profileName, { color: theme.colors.text }]}>
+                {borrower.name}
+              </Text>
+              {borrower.phone && (
+                <Text style={[styles.profileMeta, { color: theme.colors.muted }]}>
+                  📞 {borrower.phone}
+                </Text>
+              )}
+              {borrower.email && (
+                <Text style={[styles.profileMeta, { color: theme.colors.muted }]}>
+                  ✉️ {borrower.email}
+                </Text>
+              )}
+              {borrower.address && (
+                <Text style={[styles.profileMeta, { color: theme.colors.muted }]}>
+                  📍 {borrower.address}
+                </Text>
+              )}
+              {borrower.notes && (
+                <Text style={[styles.profileNotes, { color: theme.colors.muted }]}>
+                  📝 {borrower.notes}
+                </Text>
+              )}
             </View>
           </View>
 
@@ -327,7 +430,9 @@ export default function BorrowerDetail() {
                 onPress={handleCall}
               >
                 <Text style={styles.quickActionIcon}>📞</Text>
-                <Text style={[styles.quickActionText, { color: theme.colors.text }]}>Call</Text>
+                <Text style={[styles.quickActionText, { color: theme.colors.text }]}>
+                  {t('call')}
+                </Text>
               </TouchableOpacity>
             )}
             {borrower.phone && (
@@ -336,7 +441,9 @@ export default function BorrowerDetail() {
                 onPress={handleWhatsApp}
               >
                 <Text style={styles.quickActionIcon}>💬</Text>
-                <Text style={[styles.quickActionText, { color: theme.colors.text }]}>WhatsApp</Text>
+                <Text style={[styles.quickActionText, { color: theme.colors.text }]}>
+                  {t('whatsapp')}
+                </Text>
               </TouchableOpacity>
             )}
             {borrower.email && (
@@ -345,7 +452,9 @@ export default function BorrowerDetail() {
                 onPress={handleEmail}
               >
                 <Text style={styles.quickActionIcon}>✉️</Text>
-                <Text style={[styles.quickActionText, { color: theme.colors.text }]}>Email</Text>
+                <Text style={[styles.quickActionText, { color: theme.colors.text }]}>
+                  {t('email')}
+                </Text>
               </TouchableOpacity>
             )}
           </View>
@@ -353,15 +462,29 @@ export default function BorrowerDetail() {
 
         {/* Balance Summary */}
         <View style={styles.summaryGrid}>
-          <Card style={[styles.summaryCard, { backgroundColor: isDark ? theme.colors.dangerSoft : '#fef2f2' }]}>
+          <Card style={[
+            styles.summaryCard,
+            { backgroundColor: isDark ? theme.colors.dangerSoft : '#fef2f2' },
+          ]}>
             <Text style={styles.summaryEmoji}>💸</Text>
-            <Text style={[styles.summaryLabel, { color: theme.colors.muted }]}>Given</Text>
-            <Text style={[styles.summaryValue, { color: '#dc2626' }]}>{formatCurrency(totalGiven)}</Text>
+            <Text style={[styles.summaryLabel, { color: theme.colors.muted }]}>
+              {t('given')}
+            </Text>
+            <Text style={[styles.summaryValue, { color: '#dc2626' }]}>
+              {formatCurrency(totalGiven)}
+            </Text>
           </Card>
-          <Card style={[styles.summaryCard, { backgroundColor: isDark ? theme.colors.successSoft : '#ecfdf5' }]}>
+          <Card style={[
+            styles.summaryCard,
+            { backgroundColor: isDark ? theme.colors.successSoft : '#ecfdf5' },
+          ]}>
             <Text style={styles.summaryEmoji}>💰</Text>
-            <Text style={[styles.summaryLabel, { color: theme.colors.muted }]}>Received</Text>
-            <Text style={[styles.summaryValue, { color: '#059669' }]}>{formatCurrency(totalReceived)}</Text>
+            <Text style={[styles.summaryLabel, { color: theme.colors.muted }]}>
+              {t('received')}
+            </Text>
+            <Text style={[styles.summaryValue, { color: '#059669' }]}>
+              {formatCurrency(totalReceived)}
+            </Text>
           </Card>
         </View>
 
@@ -377,7 +500,11 @@ export default function BorrowerDetail() {
           },
         ]}>
           <Text style={[styles.outstandingLabel, { color: theme.colors.text }]}>
-            {outstanding > 0 ? '⚠️ They Owe You' : outstanding < 0 ? '⚠️ You Owe Them' : '✅ All Settled'}
+            {outstanding > 0
+              ? `⚠️ ${t('they_owe_you')}`
+              : outstanding < 0
+              ? `⚠️ ${t('you_owe_them')}`
+              : `✅ ${t('all_settled')}`}
           </Text>
           <Text style={[
             styles.outstandingValue,
@@ -386,8 +513,13 @@ export default function BorrowerDetail() {
             {formatCurrency(Math.abs(outstanding))}
           </Text>
           <Text style={[styles.outstandingMeta, { color: theme.colors.muted }]}>
-            {transactions.length} active transaction{transactions.length !== 1 ? 's' : ''}
-            {settlements.length > 0 ? ` • ${settlements.length} settlement${settlements.length !== 1 ? 's' : ''}` : ''}
+            {transactions.length}{' '}
+            {transactions.length !== 1
+              ? t('active_transactions')
+              : t('active_transaction')}
+            {settlements.length > 0
+              ? ` • ${settlements.length} ${settlements.length !== 1 ? t('settlements_label') : t('settlement')}`
+              : ''}
           </Text>
         </Card>
 
@@ -406,18 +538,22 @@ export default function BorrowerDetail() {
           >
             <Text style={styles.settleButtonIcon}>🤝</Text>
             <View>
-              <Text style={[styles.settleButtonText, { color: '#059669' }]}>Settle Account</Text>
+              <Text style={[styles.settleButtonText, { color: '#059669' }]}>
+                {t('settle_account')}
+              </Text>
               <Text style={[styles.settleButtonDesc, { color: theme.colors.muted }]}>
-                Mark all current transactions as completed
+                {t('settle_account_desc')}
               </Text>
             </View>
           </TouchableOpacity>
         )}
 
         {/* Chart */}
-         {chartsEnabled && (totalGiven > 0 || totalReceived > 0) && (
+        {chartsEnabled && (totalGiven > 0 || totalReceived > 0) && (
           <Card style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>📊 Given vs Received</Text>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+              📊 {t('given_vs_received')}
+            </Text>
             <HorizontalBarChart data={chartData} formatValue={formatShort} />
           </Card>
         )}
@@ -427,62 +563,84 @@ export default function BorrowerDetail() {
           <TouchableOpacity
             style={[styles.quickAddBtn, { backgroundColor: '#dc2626' }]}
             onPress={() => {
-              setTransactionForm({ type: 'given', amount: '', date: new Date().toISOString().split('T')[0], description: '' });
+              setTransactionForm({
+                type: 'given', amount: '',
+                date: new Date().toISOString().split('T')[0], description: '',
+              });
               setEditingTransaction(null);
               setTransactionModal(true);
             }}
           >
             <Text style={styles.quickAddIcon}>💸</Text>
-            <Text style={styles.quickAddText}>Give Money</Text>
+            <Text style={styles.quickAddText}>{t('give_money')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.quickAddBtn, { backgroundColor: '#059669' }]}
             onPress={() => {
-              setTransactionForm({ type: 'received', amount: '', date: new Date().toISOString().split('T')[0], description: '' });
+              setTransactionForm({
+                type: 'received', amount: '',
+                date: new Date().toISOString().split('T')[0], description: '',
+              });
               setEditingTransaction(null);
               setTransactionModal(true);
             }}
           >
             <Text style={styles.quickAddIcon}>💰</Text>
-            <Text style={styles.quickAddText}>Receive Money</Text>
+            <Text style={styles.quickAddText}>{t('receive_money')}</Text>
           </TouchableOpacity>
         </View>
 
         {/* View Toggle */}
-       {/* View Toggle: Active / Settled */}
         <View style={[styles.viewToggle, { backgroundColor: isDark ? '#334155' : '#e5e7eb' }]}>
           <TouchableOpacity
             style={[
               styles.viewToggleBtn,
-              activeViewTab === 'active' && [styles.viewToggleActive, { backgroundColor: theme.colors.surface }],
+              activeViewTab === 'active' && [
+                styles.viewToggleActive,
+                { backgroundColor: theme.colors.surface },
+              ],
             ]}
             onPress={() => setActiveViewTab('active')}
           >
-            <Text style={[
-              styles.viewToggleText,
-              { color: theme.colors.muted },
-              activeViewTab === 'active' && { color: theme.colors.text, fontWeight: '600' },
-            ]}>
-              📋 Active ({transactions.length})
-            </Text>
+            {/* Emoji + text separated for Hindi */}
+            <View style={styles.viewToggleContent}>
+              <Text style={styles.viewToggleEmoji}>📋</Text>
+              <Text style={[
+                styles.viewToggleText,
+                { color: theme.colors.muted },
+                activeViewTab === 'active' && {
+                  color: theme.colors.text, fontWeight: '600',
+                },
+              ]}>
+                {t('active_tab')} ({transactions.length})
+              </Text>
+            </View>
           </TouchableOpacity>
 
-          {/* Only show Settled tab if settlement feature is enabled */}
+          {/* Only show Settled tab if settlement enabled */}
           {settlementEnabled && (
             <TouchableOpacity
               style={[
                 styles.viewToggleBtn,
-                activeViewTab === 'settled' && [styles.viewToggleActive, { backgroundColor: theme.colors.surface }],
+                activeViewTab === 'settled' && [
+                  styles.viewToggleActive,
+                  { backgroundColor: theme.colors.surface },
+                ],
               ]}
               onPress={() => setActiveViewTab('settled')}
             >
-              <Text style={[
-                styles.viewToggleText,
-                { color: theme.colors.muted },
-                activeViewTab === 'settled' && { color: theme.colors.text, fontWeight: '600' },
-              ]}>
-                ✅ Settled ({settlements.length})
-              </Text>
+              <View style={styles.viewToggleContent}>
+                <Text style={styles.viewToggleEmoji}>✅</Text>
+                <Text style={[
+                  styles.viewToggleText,
+                  { color: theme.colors.muted },
+                  activeViewTab === 'settled' && {
+                    color: theme.colors.text, fontWeight: '600',
+                  },
+                ]}>
+                  {t('settled_tab')} ({settlements.length})
+                </Text>
+              </View>
             </TouchableOpacity>
           )}
         </View>
@@ -496,47 +654,75 @@ export default function BorrowerDetail() {
                 endDate={endDate}
                 onChange={(s, e) => { setStartDate(s); setEndDate(e); }}
                 onClear={clearDateFilter}
-                title="📅 Filter Transactions"
+                title={`📅 ${t('filter_transactions')}`}
                 autoSetDefaults={false}
               />
             </View>
 
             <Card style={styles.section}>
               <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-                📋 Active Transactions ({transactions.length})
+                📋 {t('active_transactions_title')} ({transactions.length})
               </Text>
               {transactions.length === 0 ? (
                 <Text style={[styles.empty, { color: theme.colors.muted }]}>
-                  No active transactions{startDate || endDate ? ' in this date range' : ''}
+                  {t('no_active_transactions')}
+                  {startDate || endDate ? ` ${t('no_transactions_date')}` : ''}
                 </Text>
               ) : (
-                transactions.map((t) => (
-                  <View key={t.id} style={[styles.txRow, { borderBottomColor: theme.colors.border }]}>
+                transactions.map((tx) => (
+                  <View
+                    key={tx.id}
+                    style={[styles.txRow, { borderBottomColor: theme.colors.border }]}
+                  >
                     <View style={[
                       styles.txIcon,
-                      { backgroundColor: t.type === 'given' ? isDark ? '#450a0a' : '#fef2f2' : isDark ? '#064e3b' : '#ecfdf5' },
+                      {
+                        backgroundColor: tx.type === 'given'
+                          ? isDark ? '#450a0a' : '#fef2f2'
+                          : isDark ? '#064e3b' : '#ecfdf5',
+                      },
                     ]}>
-                      <Text style={styles.txIconText}>{t.type === 'given' ? '↗️' : '↙️'}</Text>
+                      <Text style={styles.txIconText}>
+                        {tx.type === 'given' ? '↗️' : '↙️'}
+                      </Text>
                     </View>
                     <View style={styles.txInfo}>
-                      <Text style={[styles.txType, { color: theme.colors.text }]}>
-                        {t.type === 'given' ? 'Money Given' : 'Money Received'}
+                      {/* Emoji + text separated for Hindi */}
+                      <View style={styles.txTypeRow}>
+                        <Text style={styles.txTypeEmoji}>
+                          {tx.type === 'given' ? '💸' : '💰'}
+                        </Text>
+                        <Text style={[styles.txType, { color: theme.colors.text }]}>
+                          {tx.type === 'given' ? t('money_given') : t('money_received')}
+                        </Text>
+                      </View>
+                      <Text style={[styles.txDate, { color: theme.colors.muted }]}>
+                        📅 {tx.date}
                       </Text>
-                      <Text style={[styles.txDate, { color: theme.colors.muted }]}>📅 {t.date}</Text>
-                      {t.description && <Text style={[styles.txDesc, { color: theme.colors.muted }]}>{t.description}</Text>}
+                      {tx.description && (
+                        <Text style={[styles.txDesc, { color: theme.colors.muted }]}>
+                          {tx.description}
+                        </Text>
+                      )}
                     </View>
                     <View style={styles.txRight}>
-                      <Text style={[styles.txAmount, t.type === 'given' ? styles.negative : styles.positive]}>
-                        {t.type === 'given' ? '-' : '+'}{formatCurrency(t.amount)}
+                      <Text style={[
+                        styles.txAmount,
+                        tx.type === 'given' ? styles.negative : styles.positive,
+                      ]}>
+                        {tx.type === 'given' ? '-' : '+'}{formatCurrency(tx.amount)}
                       </Text>
                       <View style={styles.txActions}>
                         <TouchableOpacity
-                          onPress={() => openTransactionModal(t)}
-                          style={[styles.txEditBtn, { backgroundColor: isDark ? '#1e3a5f' : '#dbeafe' }]}
+                          onPress={() => openTransactionModal(tx)}
+                          style={[
+                            styles.txEditBtn,
+                            { backgroundColor: isDark ? '#1e3a5f' : '#dbeafe' },
+                          ]}
                         >
                           <Text style={styles.txEditBtnText}>✏️</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={() => handleDeleteTransaction(t.id)}>
+                        <TouchableOpacity onPress={() => handleDeleteTransaction(tx.id)}>
                           <Text style={styles.txDeleteBtn}>🗑️</Text>
                         </TouchableOpacity>
                       </View>
@@ -552,10 +738,12 @@ export default function BorrowerDetail() {
         {settlementEnabled && activeViewTab === 'settled' && (
           <Card style={styles.section}>
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-              ✅ Settlement History ({settlements.length})
+              ✅ {t('settlement_history')} ({settlements.length})
             </Text>
             {settlements.length === 0 ? (
-              <Text style={[styles.empty, { color: theme.colors.muted }]}>No settlements yet</Text>
+              <Text style={[styles.empty, { color: theme.colors.muted }]}>
+                {t('no_settlements_yet')}
+              </Text>
             ) : (
               settlements.map((s) => (
                 <View
@@ -569,18 +757,30 @@ export default function BorrowerDetail() {
                   ]}
                 >
                   {/* Header */}
-                  <TouchableOpacity onPress={() => handleToggleSettlement(s)} activeOpacity={0.7}>
+                  <TouchableOpacity
+                    onPress={() => handleToggleSettlement(s)}
+                    activeOpacity={0.7}
+                  >
                     <View style={styles.settlementHeader}>
-                      <View style={[styles.settlementBadge, { backgroundColor: isDark ? '#064e3b' : '#d1fae5' }]}>
+                      <View style={[
+                        styles.settlementBadge,
+                        { backgroundColor: isDark ? '#064e3b' : '#d1fae5' },
+                      ]}>
                         <Text style={styles.settlementBadgeText}>🤝</Text>
                       </View>
                       <View style={styles.settlementInfo}>
                         <Text style={[styles.settlementDate, { color: theme.colors.text }]}>
-                          Settled on {formatDateTime(s.settled_at)}
+                          {t('settled_on')} {formatDateTime(s.settled_at)}
                         </Text>
                         <Text style={[styles.settlementMeta, { color: theme.colors.muted }]}>
-                          {s.transaction_count} transaction{s.transaction_count !== 1 ? 's' : ''} •{' '}
-                          {expandedSettlement === s.id ? 'Tap to collapse ▲' : 'Tap to expand ▼'}
+                          {s.transaction_count}{' '}
+                          {s.transaction_count !== 1
+                            ? t('active_transactions')
+                            : t('active_transaction')}{' '}
+                          •{' '}
+                          {expandedSettlement === s.id
+                            ? `${t('tap_to_collapse')} ▲`
+                            : `${t('tap_to_expand')} ▼`}
                         </Text>
                       </View>
                       <TouchableOpacity
@@ -593,7 +793,9 @@ export default function BorrowerDetail() {
                           },
                         ]}
                       >
-                        <Text style={[styles.undoBtnText, { color: '#ea580c' }]}>↩️ Undo</Text>
+                        <Text style={[styles.undoBtnText, { color: '#ea580c' }]}>
+                          ↩️ {t('undo')}
+                        </Text>
                       </TouchableOpacity>
                     </View>
                   </TouchableOpacity>
@@ -601,16 +803,22 @@ export default function BorrowerDetail() {
                   {/* Summary */}
                   <View style={styles.settlementDetails}>
                     {[
-                      { label: 'Given', value: s.total_given, color: '#dc2626' },
-                      { label: 'Received', value: s.total_received, color: '#059669' },
+                      { label: t('given'), value: s.total_given, color: '#dc2626' },
+                      { label: t('received'), value: s.total_received, color: '#059669' },
                       {
-                        label: 'Balance', value: Math.abs(s.balance),
-                        color: s.balance > 0 ? '#dc2626' : s.balance < 0 ? '#059669' : theme.colors.muted,
+                        label: t('balance'),
+                        value: Math.abs(s.balance),
+                        color: s.balance > 0 ? '#dc2626'
+                          : s.balance < 0 ? '#059669'
+                          : theme.colors.muted,
                       },
                     ].map((item, i) => (
                       <View
                         key={i}
-                        style={[styles.settlementDetailItem, { backgroundColor: isDark ? '#0f172a' : '#fff' }]}
+                        style={[
+                          styles.settlementDetailItem,
+                          { backgroundColor: isDark ? '#0f172a' : '#fff' },
+                        ]}
                       >
                         <Text style={[styles.settlementDetailLabel, { color: theme.colors.muted }]}>
                           {item.label}
@@ -623,66 +831,101 @@ export default function BorrowerDetail() {
                   </View>
 
                   {s.notes && (
-                    <Text style={[styles.settlementNotes, { color: theme.colors.muted }]}>📝 {s.notes}</Text>
+                    <Text style={[styles.settlementNotes, { color: theme.colors.muted }]}>
+                      📝 {s.notes}
+                    </Text>
                   )}
 
                   {/* Expanded Transactions */}
                   {expandedSettlement === s.id && (
                     <View style={styles.settledTxContainer}>
-                      <View style={[styles.settledTxDivider, { backgroundColor: theme.colors.border }]} />
+                      <View style={[
+                        styles.settledTxDivider,
+                        { backgroundColor: theme.colors.border },
+                      ]} />
                       <Text style={[styles.settledTxTitle, { color: theme.colors.text }]}>
-                        📋 Settled Transactions
+                        📋 {t('settled_transactions')}
                       </Text>
 
                       {loadingSettlementTxs ? (
                         <Text style={[styles.settledTxLoading, { color: theme.colors.muted }]}>
-                          Loading transactions...
+                          {t('loading_transactions')}
                         </Text>
                       ) : settlementTxs.length === 0 ? (
                         <Text style={[styles.settledTxEmpty, { color: theme.colors.muted }]}>
-                          No transactions found
+                          {t('no_transactions_found')}
                         </Text>
                       ) : (
-                        settlementTxs.map((t) => (
+                        settlementTxs.map((stx) => (
                           <View
-                            key={t.id}
-                            style={[styles.settledTxRow, { borderBottomColor: theme.colors.border }]}
+                            key={stx.id}
+                            style={[
+                              styles.settledTxRow,
+                              { borderBottomColor: theme.colors.border },
+                            ]}
                           >
                             <View style={[
                               styles.settledTxDot,
-                              { backgroundColor: t.type === 'given' ? isDark ? '#450a0a' : '#fecaca' : isDark ? '#064e3b' : '#bbf7d0' },
+                              {
+                                backgroundColor: stx.type === 'given'
+                                  ? isDark ? '#450a0a' : '#fecaca'
+                                  : isDark ? '#064e3b' : '#bbf7d0',
+                              },
                             ]}>
                               <Text style={[styles.settledTxDotText, { color: theme.colors.text }]}>
-                                {t.type === 'given' ? '↗' : '↙'}
+                                {stx.type === 'given' ? '↗' : '↙'}
                               </Text>
                             </View>
                             <View style={styles.settledTxInfo}>
-                              <Text style={[styles.settledTxType, { color: theme.colors.text }]}>
-                                {t.type === 'given' ? 'Money Given' : 'Money Received'}
+                              {/* Emoji + text separated for Hindi */}
+                              <View style={styles.settledTxTypeRow}>
+                                <Text style={styles.settledTxTypeEmoji}>
+                                  {stx.type === 'given' ? '💸' : '💰'}
+                                </Text>
+                                <Text style={[styles.settledTxType, { color: theme.colors.text }]}>
+                                  {stx.type === 'given' ? t('money_given') : t('money_received')}
+                                </Text>
+                              </View>
+                              <Text style={[styles.settledTxDate, { color: theme.colors.muted }]}>
+                                {stx.date}
                               </Text>
-                              <Text style={[styles.settledTxDate, { color: theme.colors.muted }]}>{t.date}</Text>
-                              {t.description && (
-                                <Text style={[styles.settledTxDesc, { color: theme.colors.muted }]}>{t.description}</Text>
+                              {stx.description && (
+                                <Text style={[styles.settledTxDesc, { color: theme.colors.muted }]}>
+                                  {stx.description}
+                                </Text>
                               )}
                             </View>
                             <Text style={[
                               styles.settledTxAmount,
-                              { color: t.type === 'given' ? '#dc2626' : '#059669' },
+                              { color: stx.type === 'given' ? '#dc2626' : '#059669' },
                             ]}>
-                              {t.type === 'given' ? '-' : '+'}{formatCurrency(t.amount)}
+                              {stx.type === 'given' ? '-' : '+'}{formatCurrency(stx.amount)}
                             </Text>
                           </View>
                         ))
                       )}
 
                       {settlementTxs.length > 0 && (
-                        <View style={[styles.settledTxTotalRow, { borderTopColor: isDark ? '#475569' : '#d1d5db' }]}>
-                          <Text style={[styles.settledTxTotalLabel, { color: theme.colors.text }]}>Net Balance</Text>
+                        <View style={[
+                          styles.settledTxTotalRow,
+                          { borderTopColor: isDark ? '#475569' : '#d1d5db' },
+                        ]}>
+                          <Text style={[styles.settledTxTotalLabel, { color: theme.colors.text }]}>
+                            {t('net_balance')}
+                          </Text>
                           <Text style={[
                             styles.settledTxTotalValue,
-                            { color: s.balance > 0 ? '#dc2626' : s.balance < 0 ? '#059669' : theme.colors.muted },
+                            {
+                              color: s.balance > 0 ? '#dc2626'
+                                : s.balance < 0 ? '#059669'
+                                : theme.colors.muted,
+                            },
                           ]}>
-                            {s.balance > 0 ? `Owed ${formatCurrency(s.balance)}` : s.balance < 0 ? `Overpaid ${formatCurrency(Math.abs(s.balance))}` : 'Fully Settled'}
+                            {s.balance > 0
+                              ? `${t('owed')} ${formatCurrency(s.balance)}`
+                              : s.balance < 0
+                              ? `${t('overpaid')} ${formatCurrency(Math.abs(s.balance))}`
+                              : t('fully_settled')}
                           </Text>
                         </View>
                       )}
@@ -702,11 +945,15 @@ export default function BorrowerDetail() {
             borderColor: isDark ? '#dc2626' : '#fecaca',
           },
         ]}>
-          <Text style={styles.dangerTitle}>⚠️ Danger Zone</Text>
+          <Text style={styles.dangerTitle}>⚠️ {t('danger_zone')}</Text>
           <Text style={[styles.dangerDesc, { color: theme.colors.muted }]}>
-            Deleting this borrower will remove all transactions and settlements permanently.
+            {t('delete_borrower_full')}
           </Text>
-          <Button title="🗑️ Delete Borrower" variant="danger" onPress={handleDeleteBorrower} />
+          <Button
+            title={`🗑️ ${t('delete_borrower')}`}
+            variant="danger"
+            onPress={handleDeleteBorrower}
+          />
         </Card>
 
         <View style={{ height: 40 }} />
@@ -717,9 +964,10 @@ export default function BorrowerDetail() {
         <View style={[styles.modalOverlay, { backgroundColor: theme.colors.overlay }]}>
           <View style={[styles.modalContent, { backgroundColor: theme.colors.modalBg }]}>
             <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
-              {editingTransaction ? 'Edit Transaction' : 'Add Transaction'}
+              {editingTransaction ? t('edit_transaction') : t('add_transaction')}
             </Text>
 
+            {/* Type Toggle - emoji + text separated */}
             <View style={styles.typeToggle}>
               <TouchableOpacity
                 style={[
@@ -727,13 +975,20 @@ export default function BorrowerDetail() {
                   { backgroundColor: isDark ? '#334155' : '#e5e7eb' },
                   transactionForm.type === 'given' && styles.typeGivenActive,
                 ]}
-                onPress={() => setTransactionForm({ ...transactionForm, type: 'given' })}
+                onPress={() =>
+                  setTransactionForm({ ...transactionForm, type: 'given' })
+                }
               >
-                <Text style={[
-                  styles.typeText,
-                  { color: theme.colors.muted },
-                  transactionForm.type === 'given' && styles.typeTextActive,
-                ]}>💸 Given</Text>
+                <View style={styles.typeContent}>
+                  <Text style={styles.typeEmoji}>💸</Text>
+                  <Text style={[
+                    styles.typeText,
+                    { color: theme.colors.muted },
+                    transactionForm.type === 'given' && styles.typeTextActive,
+                  ]}>
+                    {t('given')}
+                  </Text>
+                </View>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
@@ -741,23 +996,59 @@ export default function BorrowerDetail() {
                   { backgroundColor: isDark ? '#334155' : '#e5e7eb' },
                   transactionForm.type === 'received' && styles.typeReceivedActive,
                 ]}
-                onPress={() => setTransactionForm({ ...transactionForm, type: 'received' })}
+                onPress={() =>
+                  setTransactionForm({ ...transactionForm, type: 'received' })
+                }
               >
-                <Text style={[
-                  styles.typeText,
-                  { color: theme.colors.muted },
-                  transactionForm.type === 'received' && styles.typeTextActive,
-                ]}>💰 Received</Text>
+                <View style={styles.typeContent}>
+                  <Text style={styles.typeEmoji}>💰</Text>
+                  <Text style={[
+                    styles.typeText,
+                    { color: theme.colors.muted },
+                    transactionForm.type === 'received' && styles.typeTextActive,
+                  ]}>
+                    {t('received')}
+                  </Text>
+                </View>
               </TouchableOpacity>
             </View>
 
-            <Input label="Amount *" value={transactionForm.amount} onChangeText={(t) => setTransactionForm({ ...transactionForm, amount: t })} placeholder="0" keyboardType="numeric" />
-            <DatePicker label="Date" value={transactionForm.date} onChange={(d) => setTransactionForm({ ...transactionForm, date: d })} />
-            <Input label="Description" value={transactionForm.description} onChangeText={(t) => setTransactionForm({ ...transactionForm, description: t })} placeholder="Optional description" />
+            <Input
+              label={`${t('amount')} *`}
+              value={transactionForm.amount}
+              onChangeText={(v) =>
+                setTransactionForm({ ...transactionForm, amount: v })
+              }
+              placeholder="0"
+              keyboardType="numeric"
+            />
+            <DatePicker
+              label={t('date')}
+              value={transactionForm.date}
+              onChange={(d) =>
+                setTransactionForm({ ...transactionForm, date: d })
+              }
+            />
+            <Input
+              label={t('description')}
+              value={transactionForm.description}
+              onChangeText={(v) =>
+                setTransactionForm({ ...transactionForm, description: v })
+              }
+              placeholder={t('optional_description')}
+            />
 
             <View style={styles.modalButtons}>
-              <Button title="Cancel" variant="secondary" onPress={() => setTransactionModal(false)} />
-              <Button title="Save" onPress={handleSaveTransaction} loading={saving} />
+              <Button
+                title={t('cancel')}
+                variant="secondary"
+                onPress={() => setTransactionModal(false)}
+              />
+              <Button
+                title={t('save')}
+                onPress={handleSaveTransaction}
+                loading={saving}
+              />
             </View>
           </View>
         </View>
@@ -767,36 +1058,74 @@ export default function BorrowerDetail() {
       <Modal visible={settleModal} animationType="slide" transparent>
         <View style={[styles.modalOverlay, { backgroundColor: theme.colors.overlay }]}>
           <View style={[styles.modalContent, { backgroundColor: theme.colors.modalBg }]}>
-            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>🤝 Settle Account</Text>
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+              🤝 {t('settle_account')}
+            </Text>
 
-            <Card style={[styles.settlePreviewCard, { backgroundColor: isDark ? '#064e3b' : '#f0fdf4' }]}>
-              <Text style={[styles.settlePreviewTitle, { color: '#059669' }]}>Settlement Summary</Text>
+            <Card style={[
+              styles.settlePreviewCard,
+              { backgroundColor: isDark ? '#064e3b' : '#f0fdf4' },
+            ]}>
+              <Text style={[styles.settlePreviewTitle, { color: '#059669' }]}>
+                {t('settlement_summary')}
+              </Text>
               <View style={styles.settlePreviewRow}>
-                <Text style={[styles.settlePreviewLabel, { color: theme.colors.text }]}>Total Given</Text>
-                <Text style={[styles.settlePreviewValue, { color: '#dc2626' }]}>{formatCurrency(totalGiven)}</Text>
+                <Text style={[styles.settlePreviewLabel, { color: theme.colors.text }]}>
+                  {t('total_given')}
+                </Text>
+                <Text style={[styles.settlePreviewValue, { color: '#dc2626' }]}>
+                  {formatCurrency(totalGiven)}
+                </Text>
               </View>
               <View style={styles.settlePreviewRow}>
-                <Text style={[styles.settlePreviewLabel, { color: theme.colors.text }]}>Total Received</Text>
-                <Text style={[styles.settlePreviewValue, { color: '#059669' }]}>{formatCurrency(totalReceived)}</Text>
+                <Text style={[styles.settlePreviewLabel, { color: theme.colors.text }]}>
+                  {t('total_received')}
+                </Text>
+                <Text style={[styles.settlePreviewValue, { color: '#059669' }]}>
+                  {formatCurrency(totalReceived)}
+                </Text>
               </View>
-              <View style={[styles.settlePreviewRow, { borderTopWidth: 1, borderTopColor: isDark ? '#059669' : '#d1fae5', paddingTop: 10, marginTop: 6 }]}>
-                <Text style={[styles.settlePreviewLabel, { fontWeight: '700', color: theme.colors.text }]}>Outstanding</Text>
+              <View style={[
+                styles.settlePreviewRow,
+                {
+                  borderTopWidth: 1,
+                  borderTopColor: isDark ? '#059669' : '#d1fae5',
+                  paddingTop: 10,
+                  marginTop: 6,
+                },
+              ]}>
+                <Text style={[
+                  styles.settlePreviewLabel,
+                  { fontWeight: '700', color: theme.colors.text },
+                ]}>
+                  {t('outstanding')}
+                </Text>
                 <Text style={[
                   styles.settlePreviewValue,
                   {
                     fontSize: 18,
-                    color: outstanding > 0 ? '#dc2626' : outstanding < 0 ? '#059669' : theme.colors.muted,
+                    color: outstanding > 0 ? '#dc2626'
+                      : outstanding < 0 ? '#059669'
+                      : theme.colors.muted,
                   },
                 ]}>
                   {formatCurrency(Math.abs(outstanding))}
                 </Text>
               </View>
               <Text style={[styles.settlePreviewMeta, { color: theme.colors.muted }]}>
-                {transactions.length} transaction{transactions.length !== 1 ? 's' : ''} will be settled
+                {transactions.length}{' '}
+                {transactions.length !== 1
+                  ? t('transactions_will_settle')
+                  : t('transaction_will_settle')}
               </Text>
             </Card>
 
-            <Input label="Settlement Notes (optional)" value={settleNotes} onChangeText={setSettleNotes} placeholder="e.g., Settled via UPI on 15 Jul" />
+            <Input
+              label={t('settlement_notes')}
+              value={settleNotes}
+              onChangeText={setSettleNotes}
+              placeholder={t('settlement_notes_placeholder')}
+            />
 
             <Text style={[
               styles.settleWarning,
@@ -806,12 +1135,21 @@ export default function BorrowerDetail() {
                 borderColor: isDark ? '#92400e' : '#fde68a',
               },
             ]}>
-              ⚠️ This will mark all current transactions as completed. They won't appear in your active totals anymore.
+              ⚠️ {t('settle_warning')}
             </Text>
 
             <View style={styles.modalButtons}>
-              <Button title="Cancel" variant="secondary" onPress={() => setSettleModal(false)} />
-              <Button title="🤝 Settle Now" variant="success" onPress={handleSettleBorrower} loading={settleSaving} />
+              <Button
+                title={t('cancel')}
+                variant="secondary"
+                onPress={() => setSettleModal(false)}
+              />
+              <Button
+                title={`🤝 ${t('settle_now')}`}
+                variant="success"
+                onPress={handleSettleBorrower}
+                loading={settleSaving}
+              />
             </View>
           </View>
         </View>
@@ -825,15 +1163,51 @@ export default function BorrowerDetail() {
             bounces={false}
           >
             <View style={styles.modalInner}>
-              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Edit Borrower</Text>
-              <Input label="Name *" value={borrowerForm.name} onChangeText={(t) => setBorrowerForm({ ...borrowerForm, name: t })} placeholder="Name" />
-              <Input label="Phone" value={borrowerForm.phone} onChangeText={(t) => setBorrowerForm({ ...borrowerForm, phone: t })} placeholder="Phone" keyboardType="phone-pad" />
-              <Input label="Email" value={borrowerForm.email} onChangeText={(t) => setBorrowerForm({ ...borrowerForm, email: t })} placeholder="Email" />
-              <Input label="Address" value={borrowerForm.address} onChangeText={(t) => setBorrowerForm({ ...borrowerForm, address: t })} placeholder="Address" />
-              <Input label="Notes" value={borrowerForm.notes} onChangeText={(t) => setBorrowerForm({ ...borrowerForm, notes: t })} placeholder="Notes" />
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+                {t('edit_borrower')}
+              </Text>
+              <Input
+                label={`${t('name')} *`}
+                value={borrowerForm.name}
+                onChangeText={(v) => setBorrowerForm({ ...borrowerForm, name: v })}
+                placeholder={t('name')}
+              />
+              <Input
+                label={t('phone')}
+                value={borrowerForm.phone}
+                onChangeText={(v) => setBorrowerForm({ ...borrowerForm, phone: v })}
+                placeholder={t('phone')}
+                keyboardType="phone-pad"
+              />
+              <Input
+                label={t('email')}
+                value={borrowerForm.email}
+                onChangeText={(v) => setBorrowerForm({ ...borrowerForm, email: v })}
+                placeholder={t('email')}
+              />
+              <Input
+                label={t('address')}
+                value={borrowerForm.address}
+                onChangeText={(v) => setBorrowerForm({ ...borrowerForm, address: v })}
+                placeholder={t('address')}
+              />
+              <Input
+                label={t('notes')}
+                value={borrowerForm.notes}
+                onChangeText={(v) => setBorrowerForm({ ...borrowerForm, notes: v })}
+                placeholder={t('notes')}
+              />
               <View style={styles.modalButtons}>
-                <Button title="Cancel" variant="secondary" onPress={() => setEditBorrowerModal(false)} />
-                <Button title="Save" onPress={handleSaveBorrower} loading={saving} />
+                <Button
+                  title={t('cancel')}
+                  variant="secondary"
+                  onPress={() => setEditBorrowerModal(false)}
+                />
+                <Button
+                  title={t('save')}
+                  onPress={handleSaveBorrower}
+                  loading={saving}
+                />
               </View>
             </View>
           </ScrollView>
@@ -849,7 +1223,15 @@ const styles = StyleSheet.create({
   loadingText: { fontSize: 16 },
 
   // Header
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 50, paddingBottom: 12, borderBottomWidth: 1 },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 50,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+  },
   backBtn: { paddingVertical: 6 },
   backBtnText: { fontSize: 16, fontWeight: '600' },
   editHeaderBtn: { fontSize: 15, fontWeight: '600' },
@@ -898,6 +1280,8 @@ const styles = StyleSheet.create({
   viewToggle: { flexDirection: 'row', marginHorizontal: 16, marginBottom: 12, borderRadius: 8, padding: 4 },
   viewToggleBtn: { flex: 1, paddingVertical: 9, alignItems: 'center', borderRadius: 6 },
   viewToggleActive: {},
+  viewToggleContent: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  viewToggleEmoji: { fontSize: 13 },
   viewToggleText: { fontSize: 13, fontWeight: '500' },
   viewToggleTextActive: {},
 
@@ -912,6 +1296,8 @@ const styles = StyleSheet.create({
   txIcon: { width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center' },
   txIconText: { fontSize: 16 },
   txInfo: { flex: 1, marginLeft: 10 },
+  txTypeRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  txTypeEmoji: { fontSize: 13 },
   txType: { fontSize: 14, fontWeight: '500' },
   txDate: { fontSize: 12, marginTop: 2 },
   txDesc: { fontSize: 12, marginTop: 3, fontStyle: 'italic' },
@@ -951,6 +1337,8 @@ const styles = StyleSheet.create({
   settledTxDot: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
   settledTxDotText: { fontSize: 13, fontWeight: '700' },
   settledTxInfo: { flex: 1, marginLeft: 10 },
+  settledTxTypeRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  settledTxTypeEmoji: { fontSize: 12 },
   settledTxType: { fontSize: 13, fontWeight: '500' },
   settledTxDate: { fontSize: 11, marginTop: 2 },
   settledTxDesc: { fontSize: 11, marginTop: 2, fontStyle: 'italic' },
@@ -977,6 +1365,8 @@ const styles = StyleSheet.create({
   typeButton: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 8 },
   typeGivenActive: { backgroundColor: '#dc2626' },
   typeReceivedActive: { backgroundColor: '#059669' },
+  typeContent: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  typeEmoji: { fontSize: 16 },
   typeText: { fontSize: 14, fontWeight: '500' },
   typeTextActive: { color: '#fff' },
 

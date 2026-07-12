@@ -42,6 +42,7 @@ const FEATURE_TOGGLES: FeatureToggle[] = [
   { key: FEATURE_KEYS.FEATURE_BACKUP_RESTORE, label: 'Backup & Restore', icon: '💾', description: 'Database backup/restore' },
   { key: FEATURE_KEYS.FEATURE_DARK_MODE, label: 'Dark Mode', icon: '🌙', description: 'Theme toggle option' },
   { key: FEATURE_KEYS.FEATURE_CHARTS, label: 'Charts & Graphs', icon: '📊', description: 'Dashboard visualizations' },
+  { key: 'app_language', label: 'Language', icon: '🌐', description: 'Default: English' }
 ];
 
 export default function UserSettings() {
@@ -92,6 +93,18 @@ export default function UserSettings() {
       setSaving(false);
     }
   };
+
+  const handleSetLanguage = async (lang: string) => {
+        setSaving(true);
+        try {
+            await setUserSetting(userId, 'app_language', lang);
+            setSettings({ ...settings, app_language: lang });
+        } catch (error) {
+            Alert.alert('Error', (error as Error).message);
+        } finally {
+            setSaving(false);
+        }
+    };
 
   const handleToggleActive = async (value: boolean) => {
     try {
@@ -264,6 +277,55 @@ export default function UserSettings() {
             🎛️ Features
           </Text>
           {FEATURE_TOGGLES.map(renderToggle)}
+        </Card>
+
+        {/* Language Control */}
+        <Card style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+            🌐 Language
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {([
+              { lang: 'en', label: 'English', icon: '🇬🇧' },
+              { lang: 'hi', label: 'हिंदी', icon: '🇮🇳' },
+            ]).map((item) => {
+              const currentLang = settings['app_language'] || 'en';
+              return (
+                <TouchableOpacity
+                  key={item.lang}
+                  style={[
+                    styles.toggleRow,
+                    {
+                      flex: 1,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      paddingVertical: 14,
+                      borderRadius: 10,
+                      borderBottomWidth: 0,
+                      backgroundColor:
+                        currentLang === item.lang
+                          ? theme.colors.primary
+                          : isDark
+                          ? '#334155'
+                          : '#e5e7eb',
+                    },
+                  ]}
+                  onPress={() => handleToggle('app_language', false)}
+                >
+                  <Text style={{ fontSize: 20, marginBottom: 4 }}>{item.icon}</Text>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: '600',
+                      color: currentLang === item.lang ? '#fff' : theme.colors.text,
+                    }}
+                  >
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </Card>
 
         {/* Reset Password */}

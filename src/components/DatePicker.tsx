@@ -11,6 +11,7 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 
 interface DatePickerProps {
   label?: string;
@@ -38,9 +39,10 @@ export default function DatePicker({
   label,
   value,
   onChange,
-  placeholder = 'YYYY-MM-DD',
+  placeholder,
 }: DatePickerProps) {
   const { theme, isDark } = useTheme();
+  const { t } = useLanguage();
   const [showPicker, setShowPicker] = useState(false);
 
   const handleDateChange = (_event: any, selectedDate?: Date) => {
@@ -78,7 +80,7 @@ export default function DatePicker({
           ]}
           value={value}
           onChangeText={onChange}
-          placeholder={placeholder}
+          placeholder={placeholder || t('format_date')}
           placeholderTextColor={theme.colors.muted}
           autoCapitalize="none"
         />
@@ -98,8 +100,9 @@ export default function DatePicker({
         </TouchableOpacity>
       </View>
 
+      {/* Format helper */}
       <Text style={[styles.helper, { color: theme.colors.muted }]}>
-        Format: YYYY-MM-DD
+        {t('format_date')}
       </Text>
 
       {/* Android - direct picker */}
@@ -140,10 +143,8 @@ export default function DatePicker({
                   { borderBottomColor: theme.colors.border },
                 ]}
               >
-                <Text
-                  style={[styles.modalTitle, { color: theme.colors.text }]}
-                >
-                  {label || 'Select Date'}
+                <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+                  {label || t('date')}
                 </Text>
                 <TouchableOpacity
                   onPress={handleDone}
@@ -152,7 +153,7 @@ export default function DatePicker({
                     { backgroundColor: theme.colors.primary },
                   ]}
                 >
-                  <Text style={styles.doneButtonText}>Done</Text>
+                  <Text style={styles.doneButtonText}>{t('done')}</Text>
                 </TouchableOpacity>
               </View>
 
@@ -253,7 +254,6 @@ const styles = StyleSheet.create({
     height: 200,
   },
   iosPickerDark: {
-    // iOS spinner adapts automatically but this ensures layout
     backgroundColor: 'transparent',
   },
 });

@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 
 interface DateRangeFilterProps {
   startDate: string;
@@ -42,6 +43,7 @@ export default function DateRangeFilter({
   autoSetDefaults = true,
 }: DateRangeFilterProps) {
   const { theme, isDark } = useTheme();
+  const { t } = useLanguage();
   const [showPicker, setShowPicker] = useState<'start' | 'end' | null>(null);
 
   useEffect(() => {
@@ -108,7 +110,7 @@ export default function DateRangeFilter({
         {hasFilter && onClear && (
           <TouchableOpacity onPress={onClear} activeOpacity={0.7}>
             <Text style={[styles.clearText, { color: theme.colors.danger }]}>
-              ✕ Clear
+              ✕ {t('clear_filter')}
             </Text>
           </TouchableOpacity>
         )}
@@ -137,18 +139,12 @@ export default function DateRangeFilter({
           activeOpacity={0.7}
         >
           <Text style={[styles.dateLabel, { color: theme.colors.muted }]}>
-            From
+            {t('from')}
           </Text>
-          <Text
-            style={[
-              styles.dateValue,
-              {
-                color: startDate
-                  ? theme.colors.primary
-                  : theme.colors.muted,
-              },
-            ]}
-          >
+          <Text style={[
+            styles.dateValue,
+            { color: startDate ? theme.colors.primary : theme.colors.muted },
+          ]}>
             {formatDisplay(startDate)}
           </Text>
         </TouchableOpacity>
@@ -178,18 +174,12 @@ export default function DateRangeFilter({
           activeOpacity={0.7}
         >
           <Text style={[styles.dateLabel, { color: theme.colors.muted }]}>
-            To
+            {t('to')}
           </Text>
-          <Text
-            style={[
-              styles.dateValue,
-              {
-                color: endDate
-                  ? theme.colors.primary
-                  : theme.colors.muted,
-              },
-            ]}
-          >
+          <Text style={[
+            styles.dateValue,
+            { color: endDate ? theme.colors.primary : theme.colors.muted },
+          ]}>
             {formatDisplay(endDate)}
           </Text>
         </TouchableOpacity>
@@ -232,10 +222,8 @@ export default function DateRangeFilter({
                   { borderBottomColor: theme.colors.border },
                 ]}
               >
-                <Text
-                  style={[styles.modalTitle, { color: theme.colors.text }]}
-                >
-                  {showPicker === 'start' ? 'From Date' : 'To Date'}
+                <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+                  {showPicker === 'start' ? t('from_date') : t('to_date')}
                 </Text>
                 <TouchableOpacity
                   onPress={handleDone}
@@ -244,7 +232,7 @@ export default function DateRangeFilter({
                     { backgroundColor: theme.colors.primary },
                   ]}
                 >
-                  <Text style={styles.doneButtonText}>Done</Text>
+                  <Text style={styles.doneButtonText}>{t('done')}</Text>
                 </TouchableOpacity>
               </View>
 

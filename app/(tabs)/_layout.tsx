@@ -2,10 +2,12 @@ import { Tabs } from 'expo-router';
 import { Text } from 'react-native';
 import { useTheme } from '../../src/context/ThemeContext';
 import { useAppSettings, FEATURE_KEYS } from '../../src/context/AppSettingsContext';
+import { useLanguage } from '../../src/context/LanguageContext';
 
 export default function TabLayout() {
   const { theme } = useTheme();
   const { isEnabled } = useAppSettings();
+  const { t } = useLanguage();
 
   const moneyEnabled = isEnabled(FEATURE_KEYS.MODULE_MONEY);
   const expenseEnabled = isEnabled(FEATURE_KEYS.MODULE_EXPENSE);
@@ -29,14 +31,14 @@ export default function TabLayout() {
       <Tabs.Screen
         name="dashboard"
         options={{
-          title: 'Dashboard',
+          title: t('tab_dashboard'),
           tabBarIcon: () => <Text style={{ fontSize: 22 }}>📊</Text>,
         }}
       />
       <Tabs.Screen
         name="money"
         options={{
-          title: 'Money',
+          title: t('tab_money'),
           tabBarIcon: () => <Text style={{ fontSize: 22 }}>💰</Text>,
           href: moneyEnabled ? '/(tabs)/money' : null,
         }}
@@ -44,7 +46,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="expenses"
         options={{
-          title: 'Expenses',
+          title: t('tab_expenses'),
           tabBarIcon: () => <Text style={{ fontSize: 22 }}>💸</Text>,
           href: expenseEnabled ? '/(tabs)/expenses' : null,
         }}
@@ -52,7 +54,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="more"
         options={{
-          title: 'More',
+          title: t('tab_more'),
           tabBarIcon: () => <Text style={{ fontSize: 22 }}>⚙️</Text>,
         }}
       />

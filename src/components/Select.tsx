@@ -8,6 +8,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 
 interface Option {
   value: number | string;
@@ -28,12 +29,16 @@ export function Select({
   value,
   options,
   onChange,
-  placeholder = 'Select...',
+  placeholder,
 }: SelectProps) {
   const { theme, isDark } = useTheme();
+  const { t } = useLanguage();
   const [visible, setVisible] = useState(false);
 
   const selectedOption = options.find((opt) => opt.value === value);
+
+  // Use translated placeholder if none provided
+  const displayPlaceholder = placeholder || t('select');
 
   return (
     <View style={styles.container}>
@@ -67,10 +72,13 @@ export function Select({
             style={[
               styles.selectorText,
               { color: theme.colors.text },
-              !selectedOption && { color: theme.colors.muted, fontWeight: '500' },
+              !selectedOption && {
+                color: theme.colors.muted,
+                fontWeight: '500',
+              },
             ]}
           >
-            {selectedOption?.label || placeholder}
+            {selectedOption?.label || displayPlaceholder}
           </Text>
         </View>
 
@@ -106,7 +114,7 @@ export function Select({
                 },
               ]}
             >
-              {label || 'Select'}
+              {label || t('select')}
             </Text>
 
             {/* Options List */}
@@ -120,7 +128,9 @@ export function Select({
                     style={[
                       styles.option,
                       {
-                        borderBottomColor: isDark ? theme.colors.border : '#f1f5f9',
+                        borderBottomColor: isDark
+                          ? theme.colors.border
+                          : '#f1f5f9',
                         backgroundColor: isSelected
                           ? isDark
                             ? theme.colors.primarySoft
@@ -153,7 +163,12 @@ export function Select({
                     </Text>
 
                     {isSelected && (
-                      <Text style={[styles.checkmark, { color: theme.colors.primary }]}>
+                      <Text
+                        style={[
+                          styles.checkmark,
+                          { color: theme.colors.primary },
+                        ]}
+                      >
                         ✓
                       </Text>
                     )}

@@ -5,6 +5,8 @@ import { useAuth } from '../src/context/AuthContext';
 import { Input } from '../src/components/Input';
 import { Button } from '../src/components/Button';
 import { Card } from '../src/components/Card';
+import { useTheme } from '../src/context/ThemeContext';
+import { useLanguage } from '../src/context/LanguageContext';
 
 export default function Signup() {
   const [name, setName] = useState('');
@@ -14,18 +16,20 @@ export default function Signup() {
   const [loading, setLoading] = useState(false);
   const { signup } = useAuth();
   const router = useRouter();
+  const { theme } = useTheme();
+  const { t } = useLanguage();
 
   async function handleSignup() {
     if (!name || !email || !password || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Alert.alert(t('error'), t('fill_all_fields'));
       return;
     }
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
+      Alert.alert(t('error'), t('passwords_not_match'));
       return;
     }
     if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+      Alert.alert(t('error'), t('password_min_length'));
       return;
     }
 
@@ -34,30 +38,30 @@ export default function Signup() {
       await signup(name, email, password);
       router.replace('/(tabs)/dashboard');
     } catch (error) {
-      Alert.alert('Signup Failed', (error as Error).message);
+      Alert.alert(t('signup_failed'), (error as Error).message);
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.header}>
             <Text style={styles.logo}>💰</Text>
-            <Text style={styles.title}>Create Account</Text>
-            <Text style={styles.subtitle}>Start tracking your finances</Text>
+            <Text style={styles.title}>{t('create_account')}</Text>
+            <Text style={styles.subtitle}>{t('start_tracking')}</Text>
           </View>
 
           <Card style={styles.card}>
-            <Input label="Full Name" value={name} onChangeText={setName} placeholder="John Doe" />
-            <Input label="Email" value={email} onChangeText={setEmail} placeholder="you@example.com" keyboardType="email-address" autoCapitalize="none" />
-            <Input label="Password" value={password} onChangeText={setPassword} placeholder="••••••••" secureTextEntry />
-            <Input label="Confirm Password" value={confirmPassword} onChangeText={setConfirmPassword} placeholder="••••••••" secureTextEntry />
-            <Button title="Create Account" onPress={handleSignup} loading={loading} style={styles.button} />
+            <Input label={t('full_name')} value={name} onChangeText={setName} placeholder="John Doe" />
+            <Input label={t('email')} value={email} onChangeText={setEmail} placeholder="you@example.com" keyboardType="email-address" autoCapitalize="none" />
+            <Input label={t('password')} value={password} onChangeText={setPassword} placeholder="••••••••" secureTextEntry />
+            <Input label={t('confirm_password')} value={confirmPassword} onChangeText={setConfirmPassword} placeholder="••••••••" secureTextEntry />
+            <Button title={t('create_account')} onPress={handleSignup} loading={loading} style={styles.button} />
             <TouchableOpacity onPress={() => router.push('/login')}>
-              <Text style={styles.link}>Already have an account? <Text style={styles.linkBold}>Sign In</Text></Text>
+              <Text style={styles.link}>{t('already_have_account')} <Text style={styles.linkBold}>{t('sign_in')}</Text></Text>
             </TouchableOpacity>
           </Card>
         </ScrollView>

@@ -18,6 +18,7 @@ import { adminLogin } from '../src/lib/database';
 import { Input } from '../src/components/Input';
 import { Button } from '../src/components/Button';
 import { Card } from '../src/components/Card';
+import { useLanguage } from '../src/context/LanguageContext';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -26,6 +27,7 @@ export default function Login() {
   const { login } = useAuth();
   const { theme, isDark } = useTheme();
   const router = useRouter();
+  const { t } = useLanguage();
 
   // Admin login
   const [adminModal, setAdminModal] = useState(false);
@@ -35,7 +37,7 @@ export default function Login() {
 
   async function handleLogin() {
     if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+       Alert.alert(t('error'), t('fill_all_fields'));
       return;
     }
     setLoading(true);
@@ -43,7 +45,7 @@ export default function Login() {
       await login(email, password);
       router.replace('/(tabs)/dashboard');
     } catch (error) {
-      Alert.alert('Login Failed', (error as Error).message);
+      Alert.alert(t('login_failed'), (error as Error).message);
     } finally {
       setLoading(false);
     }
@@ -51,7 +53,7 @@ export default function Login() {
 
   async function handleAdminLogin() {
     if (!adminEmail || !adminPassword) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Alert.alert(t('error'), t('fill_all_fields'));
       return;
     }
     setAdminLoading(true);
@@ -65,7 +67,7 @@ export default function Login() {
         params: { adminId: admin.id, adminName: admin.name },
       });
     } catch (error) {
-      Alert.alert('Admin Login Failed', (error as Error).message);
+      Alert.alert(t('admin_login_failed'), (error as Error).message);
     } finally {
       setAdminLoading(false);
     }
@@ -84,17 +86,17 @@ export default function Login() {
           <View style={styles.header}>
             <Text style={styles.logo}>💰</Text>
             <Text style={[styles.title, { color: theme.colors.text }]}>
-              Money & Expense
+              {t('app_name')}
             </Text>
             <Text style={[styles.subtitle, { color: theme.colors.muted }]}>
-              Track your finances offline
+              {t('app_tagline')}
             </Text>
           </View>
 
           {/* Login Card */}
           <Card style={styles.card}>
             <Input
-              label="Email"
+              label={t('email')}
               value={email}
               onChangeText={setEmail}
               placeholder="you@example.com"
@@ -102,23 +104,23 @@ export default function Login() {
               autoCapitalize="none"
             />
             <Input
-              label="Password"
+              label={t('password')}
               value={password}
               onChangeText={setPassword}
               placeholder="••••••••"
               secureTextEntry
             />
             <Button
-              title="Sign In"
+              title={t('sign_in')}
               onPress={handleLogin}
               loading={loading}
               style={styles.button}
             />
             <TouchableOpacity onPress={() => router.push('/signup')}>
               <Text style={[styles.link, { color: theme.colors.muted }]}>
-                Don't have an account?{' '}
+                {t('dont_have_account')}{' '}
                 <Text style={[styles.linkBold, { color: theme.colors.primary }]}>
-                  Sign Up
+                  {t('sign_up')}
                 </Text>
               </Text>
             </TouchableOpacity>
@@ -137,7 +139,7 @@ export default function Login() {
           >
             <Text style={styles.adminIcon}>🔐</Text>
             <Text style={[styles.adminText, { color: theme.colors.muted }]}>
-              Admin Login
+              {t('admin_login')}
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -159,7 +161,7 @@ export default function Login() {
           >
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
-                🔐 Admin Login
+                🔐 {t('admin_login')}
               </Text>
               <TouchableOpacity onPress={() => setAdminModal(false)}>
                 <Text style={[styles.closeBtn, { color: theme.colors.muted }]}>
@@ -171,11 +173,11 @@ export default function Login() {
             <Text
               style={[styles.modalDesc, { color: theme.colors.muted }]}
             >
-              Login as administrator to manage users and app settings.
+              {t('admin_login_desc')}
             </Text>
 
             <Input
-              label="Admin Email"
+              label={t('admin_email')}
               value={adminEmail}
               onChangeText={setAdminEmail}
               placeholder="admin@app.local"
@@ -183,7 +185,7 @@ export default function Login() {
               autoCapitalize="none"
             />
             <Input
-              label="Admin Password"
+              label={t('admin_password')}
               value={adminPassword}
               onChangeText={setAdminPassword}
               placeholder="••••••••"
@@ -205,18 +207,18 @@ export default function Login() {
                   { color: isDark ? '#fcd34d' : '#92400e' },
                 ]}
               >
-                💡 Default: admin@app.local / admin123
+                💡 {t('admin_default_creds')}
               </Text>
             </View>
 
             <View style={styles.modalButtons}>
               <Button
-                title="Cancel"
+                title={t('cancel')}
                 variant="secondary"
                 onPress={() => setAdminModal(false)}
               />
               <Button
-                title="Login as Admin"
+                title={t('login_as_admin')}
                 onPress={handleAdminLogin}
                 loading={adminLoading}
               />
