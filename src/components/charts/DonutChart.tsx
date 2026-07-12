@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { useTheme } from '../../context/ThemeContext';
 
 interface DonutSegment {
   label: string;
@@ -22,20 +23,19 @@ export function DonutChart({
   centerLabel,
   centerValue,
 }: DonutChartProps) {
+  const { theme, isDark } = useTheme();
   const filtered = data.filter((d) => d.value > 0);
   const total = filtered.reduce((s, d) => s + d.value, 0);
 
   if (total === 0) {
     return (
       <View style={[styles.emptyContainer, { width: size, height: size }]}>
-        <Text style={styles.emptyText}>No data</Text>
+        <Text style={[styles.emptyText, { color: theme.colors.muted }]}>
+          No data
+        </Text>
       </View>
     );
   }
-
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const center = size / 2;
 
   let accumulatedOffset = 0;
 
@@ -52,11 +52,12 @@ export function DonutChart({
               height: size,
               borderRadius: size / 2,
               borderWidth: strokeWidth,
+              borderColor: isDark ? '#334155' : '#f3f4f6',
             },
           ]}
         />
 
-        {/* Segments using border trick */}
+        {/* Segments */}
         {filtered.map((segment, index) => {
           const percentage = segment.value / total;
           const segmentAngle = percentage * 360;
@@ -101,11 +102,13 @@ export function DonutChart({
         {/* Center text */}
         <View style={[styles.centerContent, { width: size, height: size }]}>
           {centerLabel && (
-            <Text style={styles.centerLabel}>{centerLabel}</Text>
+            <Text style={[styles.centerLabel, { color: theme.colors.muted }]}>
+              {centerLabel}
+            </Text>
           )}
           {centerValue && (
             <Text
-              style={styles.centerValue}
+              style={[styles.centerValue, { color: theme.colors.text }]}
               numberOfLines={1}
               adjustsFontSizeToFit
             >
@@ -120,14 +123,28 @@ export function DonutChart({
         {filtered.map((segment, index) => {
           const pct = ((segment.value / total) * 100).toFixed(1);
           return (
-            <View key={index} style={styles.legendItem}>
+            <View
+              key={index}
+              style={[
+                styles.legendItem,
+                {
+                  backgroundColor: isDark ? '#334155' : '#f9fafb',
+                  borderColor: isDark ? '#475569' : '#f3f4f6',
+                },
+              ]}
+            >
               <View
                 style={[styles.legendDot, { backgroundColor: segment.color }]}
               />
-              <Text style={styles.legendLabel} numberOfLines={1}>
+              <Text
+                style={[styles.legendLabel, { color: theme.colors.textSecondary }]}
+                numberOfLines={1}
+              >
                 {segment.label}
               </Text>
-              <Text style={styles.legendPct}>{pct}%</Text>
+              <Text style={[styles.legendPct, { color: theme.colors.muted }]}>
+                {pct}%
+              </Text>
             </View>
           );
         })}
@@ -147,12 +164,10 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   emptyText: {
-    color: '#9ca3af',
     fontSize: 14,
   },
   backgroundCircle: {
     position: 'absolute',
-    borderColor: '#f3f4f6',
   },
   segmentContainer: {
     position: 'absolute',
@@ -168,13 +183,11 @@ const styles = StyleSheet.create({
   },
   centerLabel: {
     fontSize: 11,
-    color: '#6b7280',
     marginBottom: 2,
   },
   centerValue: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#111827',
   },
   legend: {
     flexDirection: 'row',
@@ -187,12 +200,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#f9fafb',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#f3f4f6',
   },
   legendDot: {
     width: 10,
@@ -201,12 +212,10 @@ const styles = StyleSheet.create({
   },
   legendLabel: {
     fontSize: 12,
-    color: '#374151',
     maxWidth: 80,
   },
   legendPct: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#6b7280',
   },
 });

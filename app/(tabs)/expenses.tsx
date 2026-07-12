@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
+import { useTheme } from '../../src/context/ThemeContext';
 import {
   getExpenses,
   getExpenseCategories,
@@ -37,13 +38,8 @@ import DateRangeFilter from '../../src/components/DateRangeFilter';
 type Tab = 'expenses' | 'categories';
 
 const COLORS = [
-  '#ef4444',
-  '#f59e0b',
-  '#10b981',
-  '#3b82f6',
-  '#8b5cf6',
-  '#ec4899',
-  '#6b7280',
+  '#ef4444', '#f59e0b', '#10b981',
+  '#3b82f6', '#8b5cf6', '#ec4899', '#6b7280',
 ];
 
 function normalizeDate(date: string) {
@@ -67,22 +63,18 @@ function isDateInRange(recordDate: string, startDate: string, endDate: string) {
 
 export default function Expenses() {
   const { user } = useAuth();
+  const { theme, isDark } = useTheme();
 
   const [activeTab, setActiveTab] = useState<Tab>('expenses');
   const [expenses, setExpenses] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-
-  // Date filter
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-
   const [expenseModal, setExpenseModal] = useState(false);
   const [editingExpense, setEditingExpense] = useState<any>(null);
-
   const [categoryModal, setCategoryModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<any>(null);
-
   const [expenseForm, setExpenseForm] = useState({
     categoryId: '' as number | string,
     amount: '',
@@ -90,17 +82,10 @@ export default function Expenses() {
     description: '',
     photoUri: null as string | null,
   });
-
-  const [categoryForm, setCategoryForm] = useState({
-    name: '',
-    color: COLORS[0],
-  });
-
+  const [categoryForm, setCategoryForm] = useState({ name: '', color: COLORS[0] });
   const [saving, setSaving] = useState(false);
   const [filterCategory, setFilterCategory] = useState<number | string>('');
   const [generatingReport, setGeneratingReport] = useState(false);
-
-  // Photo viewer
   const [viewerVisible, setViewerVisible] = useState(false);
   const [viewerPhotoUri, setViewerPhotoUri] = useState('');
 
@@ -118,11 +103,7 @@ export default function Expenses() {
     }
   };
 
-  useFocusEffect(
-    useCallback(() => {
-      loadData();
-    }, [user])
-  );
+  useFocusEffect(useCallback(() => { loadData(); }, [user]));
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -141,10 +122,7 @@ export default function Expenses() {
   const handleTakePhoto = async () => {
     const uri = await takePhoto();
     if (uri) {
-      // Delete old photo if exists
-      if (expenseForm.photoUri) {
-        await deletePhoto(expenseForm.photoUri);
-      }
+      if (expenseForm.photoUri) await deletePhoto(expenseForm.photoUri);
       setExpenseForm({ ...expenseForm, photoUri: uri });
     }
   };
@@ -152,17 +130,13 @@ export default function Expenses() {
   const handlePickPhoto = async () => {
     const uri = await pickPhoto();
     if (uri) {
-      if (expenseForm.photoUri) {
-        await deletePhoto(expenseForm.photoUri);
-      }
+      if (expenseForm.photoUri) await deletePhoto(expenseForm.photoUri);
       setExpenseForm({ ...expenseForm, photoUri: uri });
     }
   };
 
   const handleRemovePhoto = async () => {
-    if (expenseForm.photoUri) {
-      await deletePhoto(expenseForm.photoUri);
-    }
+    if (expenseForm.photoUri) await deletePhoto(expenseForm.photoUri);
     setExpenseForm({ ...expenseForm, photoUri: null });
   };
 
@@ -212,34 +186,22 @@ export default function Expenses() {
       Alert.alert('Error', 'Please enter date');
       return;
     }
-
     setSaving(true);
     try {
       if (editingExpense) {
-        // If photo changed, delete old one
-        if (
-          editingExpense.photo_uri &&
-          editingExpense.photo_uri !== expenseForm.photoUri
-        ) {
+        if (editingExpense.photo_uri && editingExpense.photo_uri !== expenseForm.photoUri) {
           await deletePhoto(editingExpense.photo_uri);
         }
         await updateExpense(
-          editingExpense.id,
-          user!.id,
-          Number(expenseForm.categoryId),
-          Number(expenseForm.amount),
-          expenseForm.date,
-          expenseForm.description,
-          expenseForm.photoUri || undefined
+          editingExpense.id, user!.id,
+          Number(expenseForm.categoryId), Number(expenseForm.amount),
+          expenseForm.date, expenseForm.description, expenseForm.photoUri || undefined
         );
       } else {
         await createExpense(
-          user!.id,
-          Number(expenseForm.categoryId),
-          Number(expenseForm.amount),
-          expenseForm.date,
-          expenseForm.description,
-          expenseForm.photoUri || undefined
+          user!.id, Number(expenseForm.categoryId),
+          Number(expenseForm.amount), expenseForm.date,
+          expenseForm.description, expenseForm.photoUri || undefined
         );
       }
       setExpenseModal(false);
@@ -271,10 +233,7 @@ export default function Expenses() {
   const openCategoryModal = (category?: any) => {
     if (category) {
       setEditingCategory(category);
-      setCategoryForm({
-        name: category.name,
-        color: category.color || COLORS[0],
-      });
+      setCategoryForm({ name: category.name, color: category.color || COLORS[0] });
     } else {
       setEditingCategory(null);
       setCategoryForm({ name: '', color: COLORS[0] });
@@ -290,18 +249,9 @@ export default function Expenses() {
     setSaving(true);
     try {
       if (editingCategory) {
-        await updateExpenseCategory(
-          editingCategory.id,
-          user!.id,
-          categoryForm.name.trim(),
-          categoryForm.color
-        );
+        await updateExpenseCategory(editingCategory.id, user!.id, categoryForm.name.trim(), categoryForm.color);
       } else {
-        await createExpenseCategory(
-          user!.id,
-          categoryForm.name.trim(),
-          categoryForm.color
-        );
+        await createExpenseCategory(user!.id, categoryForm.name.trim(), categoryForm.color);
       }
       setCategoryModal(false);
       await loadData();
@@ -336,17 +286,12 @@ export default function Expenses() {
     if (!user) return;
     setGeneratingReport(true);
     try {
-      const categoryMap: Record<
-        number,
-        { id: number; name: string; color: string; total: number }
-      > = {};
+      const categoryMap: Record<number, { id: number; name: string; color: string; total: number }> = {};
       filteredExpenses.forEach((e) => {
         if (!categoryMap[e.category_id]) {
           categoryMap[e.category_id] = {
-            id: e.category_id,
-            name: e.category_name,
-            color: e.category_color || '#6b7280',
-            total: 0,
+            id: e.category_id, name: e.category_name,
+            color: e.category_color || '#6b7280', total: 0,
           };
         }
         categoryMap[e.category_id].total += Number(e.amount || 0);
@@ -354,12 +299,9 @@ export default function Expenses() {
 
       await generateExpenseReport({
         userName: user.name,
-        startDate,
-        endDate,
-        totalExpenses,
+        startDate, endDate, totalExpenses,
         expenses: filteredExpenses.map((e) => ({
-          id: e.id,
-          date: e.date,
+          id: e.id, date: e.date,
           category_name: e.category_name,
           category_color: e.category_color || '#6b7280',
           amount: Number(e.amount || 0),
@@ -374,61 +316,61 @@ export default function Expenses() {
     }
   };
 
-  // ── Formatting & filtering ─────────────────────────────────────────────
+  // ── Filter ─────────────────────────────────────────────────────────────
 
   const formatCurrency = (amount: number) =>
-    '₹' +
-    Number(amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+    '₹' + Number(amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
 
   const filteredExpenses = expenses.filter((expense) => {
     const matchesDate = isDateInRange(expense.date, startDate, endDate);
-    const matchesCategory =
-      !filterCategory || expense.category_id === Number(filterCategory);
+    const matchesCategory = !filterCategory || expense.category_id === Number(filterCategory);
     return matchesDate && matchesCategory;
   });
 
   const totalExpenses = filteredExpenses.reduce(
-    (sum, expense) => sum + Number(expense.amount || 0),
-    0
+    (sum, expense) => sum + Number(expense.amount || 0), 0
   );
 
   // ── Render ──────────────────────────────────────────────────────────────
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+
       {/* Tabs */}
-      <View style={styles.tabs}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'expenses' && styles.activeTab]}
-          onPress={() => setActiveTab('expenses')}
-        >
-          <Text
+      <View style={[
+        styles.tabs,
+        { backgroundColor: isDark ? '#334155' : '#e5e7eb' },
+      ]}>
+        {(['expenses', 'categories'] as Tab[]).map((tab) => (
+          <TouchableOpacity
+            key={tab}
             style={[
-              styles.tabText,
-              activeTab === 'expenses' && styles.activeTabText,
+              styles.tab,
+              activeTab === tab && [
+                styles.activeTab,
+                { backgroundColor: theme.colors.surface },
+              ],
             ]}
+            onPress={() => setActiveTab(tab)}
           >
-            💸 Expenses
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'categories' && styles.activeTab]}
-          onPress={() => setActiveTab('categories')}
-        >
-          <Text
-            style={[
+            <Text style={[
               styles.tabText,
-              activeTab === 'categories' && styles.activeTabText,
-            ]}
-          >
-            🏷️ Categories
-          </Text>
-        </TouchableOpacity>
+              { color: theme.colors.muted },
+              activeTab === tab && { color: theme.colors.text, fontWeight: '600' },
+            ]}>
+              {tab === 'expenses' ? '💸 Expenses' : '🏷️ Categories'}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       <ScrollView
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={theme.colors.primary}
+          />
         }
       >
         {activeTab === 'expenses' ? (
@@ -438,10 +380,7 @@ export default function Expenses() {
               <DateRangeFilter
                 startDate={startDate}
                 endDate={endDate}
-                onChange={(s, e) => {
-                  setStartDate(s);
-                  setEndDate(e);
-                }}
+                onChange={(s, e) => { setStartDate(s); setEndDate(e); }}
                 onClear={clearDateFilter}
               />
             </View>
@@ -454,29 +393,27 @@ export default function Expenses() {
                 onChange={setFilterCategory}
                 options={[
                   { value: '', label: 'All Categories' },
-                  ...categories.map((c) => ({
-                    value: c.id,
-                    label: c.name,
-                    color: c.color,
-                  })),
+                  ...categories.map((c) => ({ value: c.id, label: c.name, color: c.color })),
                 ]}
                 placeholder="All Categories"
               />
             </View>
 
             {/* Total + Report */}
-            <Card style={styles.totalCard}>
-              <Text style={styles.totalLabel}>
-                Total{' '}
-                {filterCategory || startDate || endDate ? 'Filtered' : ''}{' '}
-                Expenses
+            <Card style={[
+              styles.totalCard,
+              { backgroundColor: isDark ? theme.colors.dangerSoft : '#fef2f2' },
+            ]}>
+              <Text style={[styles.totalLabel, { color: theme.colors.muted }]}>
+                Total {filterCategory || startDate || endDate ? 'Filtered' : ''} Expenses
               </Text>
-              <Text style={styles.totalValue}>
+              <Text style={[styles.totalValue, { color: theme.colors.danger }]}>
                 {formatCurrency(totalExpenses)}
               </Text>
               <TouchableOpacity
                 style={[
                   styles.reportButton,
+                  { backgroundColor: theme.colors.primary },
                   generatingReport && { opacity: 0.6 },
                 ]}
                 onPress={handleGenerateReport}
@@ -485,16 +422,12 @@ export default function Expenses() {
                 {generatingReport ? (
                   <View style={styles.reportButtonContent}>
                     <ActivityIndicator size="small" color="#fff" />
-                    <Text style={styles.reportButtonText}>
-                      Generating PDF...
-                    </Text>
+                    <Text style={styles.reportButtonText}>Generating PDF...</Text>
                   </View>
                 ) : (
                   <View style={styles.reportButtonContent}>
                     <Text style={styles.reportButtonIcon}>📄</Text>
-                    <Text style={styles.reportButtonText}>
-                      Generate PDF Report
-                    </Text>
+                    <Text style={styles.reportButtonText}>Generate PDF Report</Text>
                   </View>
                 )}
               </TouchableOpacity>
@@ -503,7 +436,7 @@ export default function Expenses() {
             {/* Expense list */}
             {filteredExpenses.length === 0 ? (
               <Card>
-                <Text style={styles.empty}>
+                <Text style={[styles.empty, { color: theme.colors.muted }]}>
                   No expenses found. Tap + to add one.
                 </Text>
               </Card>
@@ -511,17 +444,17 @@ export default function Expenses() {
               filteredExpenses.map((e) => (
                 <Card key={e.id} style={styles.itemCard}>
                   <View style={styles.expenseRow}>
-                    {/* Thumbnail */}
+                    {/* Thumbnail or dot */}
                     {e.photo_uri ? (
                       <TouchableOpacity
                         onPress={() => handleViewExpensePhoto(e.photo_uri)}
                         activeOpacity={0.8}
                       >
-                        <Image
-                          source={{ uri: e.photo_uri }}
-                          style={styles.thumbnail}
-                        />
-                        <View style={styles.thumbnailBadge}>
+                        <Image source={{ uri: e.photo_uri }} style={styles.thumbnail} />
+                        <View style={[
+                          styles.thumbnailBadge,
+                          { backgroundColor: theme.colors.surface },
+                        ]}>
                           <Text style={styles.thumbnailBadgeText}>📷</Text>
                         </View>
                       </TouchableOpacity>
@@ -529,42 +462,40 @@ export default function Expenses() {
                       <View
                         style={[
                           styles.colorDot,
-                          {
-                            backgroundColor:
-                              e.category_color || e.color || '#6b7280',
-                          },
+                          { backgroundColor: e.category_color || e.color || '#6b7280' },
                         ]}
                       />
                     )}
 
                     <View style={{ flex: 1, marginLeft: e.photo_uri ? 12 : 0 }}>
-                      <Text style={styles.expenseCategory}>
+                      <Text style={[styles.expenseCategory, { color: theme.colors.text }]}>
                         {e.category_name}
                       </Text>
-                      <Text style={styles.expenseDate}>📅 {e.date}</Text>
+                      <Text style={[styles.expenseDate, { color: theme.colors.muted }]}>
+                        📅 {e.date}
+                      </Text>
                       {e.description ? (
-                        <Text style={styles.expenseDesc}>
+                        <Text style={[styles.expenseDesc, { color: theme.colors.muted }]}>
                           {e.description}
                         </Text>
                       ) : null}
                     </View>
 
                     <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={styles.expenseAmount}>
+                      <Text style={[styles.expenseAmount, { color: theme.colors.danger }]}>
                         -{formatCurrency(e.amount)}
                       </Text>
                       <View style={styles.actionButtons}>
                         <TouchableOpacity
                           onPress={() => openExpenseModal(e)}
-                          style={styles.editBtn}
+                          style={[
+                            styles.editBtn,
+                            { backgroundColor: isDark ? '#1e3a5f' : '#dbeafe' },
+                          ]}
                         >
                           <Text style={styles.editBtnText}>✏️</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity
-                          onPress={() =>
-                            handleDeleteExpense(e.id, e.photo_uri)
-                          }
-                        >
+                        <TouchableOpacity onPress={() => handleDeleteExpense(e.id, e.photo_uri)}>
                           <Text style={styles.deleteBtn}>🗑️</Text>
                         </TouchableOpacity>
                       </View>
@@ -585,29 +516,29 @@ export default function Expenses() {
             {/* Categories tab */}
             {categories.length === 0 ? (
               <Card>
-                <Text style={styles.empty}>No categories yet</Text>
+                <Text style={[styles.empty, { color: theme.colors.muted }]}>
+                  No categories yet
+                </Text>
               </Card>
             ) : (
               categories.map((c) => (
                 <Card key={c.id} style={styles.itemCard}>
                   <View style={styles.categoryRow}>
-                    <View
-                      style={[
-                        styles.largeColorDot,
-                        { backgroundColor: c.color || '#6b7280' },
-                      ]}
-                    />
-                    <Text style={styles.categoryName}>{c.name}</Text>
+                    <View style={[styles.largeColorDot, { backgroundColor: c.color || '#6b7280' }]} />
+                    <Text style={[styles.categoryName, { color: theme.colors.text }]}>
+                      {c.name}
+                    </Text>
                     <View style={styles.actionButtons}>
                       <TouchableOpacity
                         onPress={() => openCategoryModal(c)}
-                        style={styles.editBtn}
+                        style={[
+                          styles.editBtn,
+                          { backgroundColor: isDark ? '#1e3a5f' : '#dbeafe' },
+                        ]}
                       >
                         <Text style={styles.editBtnText}>✏️</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => handleDeleteCategory(c.id, c.name)}
-                      >
+                      <TouchableOpacity onPress={() => handleDeleteCategory(c.id, c.name)}>
                         <Text style={styles.deleteBtn}>🗑️</Text>
                       </TouchableOpacity>
                     </View>
@@ -628,32 +559,30 @@ export default function Expenses() {
 
       {/* ── Expense Modal ──────────────────────────────────────────────── */}
       <Modal visible={expenseModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <ScrollView style={styles.modalScrollContent} bounces={false}>
+        <View style={[styles.modalOverlay, { backgroundColor: theme.colors.overlay }]}>
+          <ScrollView
+            style={[
+              styles.modalScrollContent,
+              { backgroundColor: theme.colors.modalBg },
+            ]}
+            bounces={false}
+          >
             <View style={styles.modalInner}>
-              <Text style={styles.modalTitle}>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
                 {editingExpense ? 'Edit Expense' : 'Add Expense'}
               </Text>
 
               <Select
                 label="Category *"
                 value={expenseForm.categoryId}
-                onChange={(v) =>
-                  setExpenseForm({ ...expenseForm, categoryId: v })
-                }
-                options={categories.map((c) => ({
-                  value: c.id,
-                  label: c.name,
-                  color: c.color,
-                }))}
+                onChange={(v) => setExpenseForm({ ...expenseForm, categoryId: v })}
+                options={categories.map((c) => ({ value: c.id, label: c.name, color: c.color }))}
               />
 
               <Input
                 label="Amount"
                 value={expenseForm.amount}
-                onChangeText={(t) =>
-                  setExpenseForm({ ...expenseForm, amount: t })
-                }
+                onChangeText={(t) => setExpenseForm({ ...expenseForm, amount: t })}
                 placeholder="0"
                 keyboardType="numeric"
               />
@@ -661,21 +590,16 @@ export default function Expenses() {
               <DatePicker
                 label="Date"
                 value={expenseForm.date}
-                onChange={(d) =>
-                  setExpenseForm({ ...expenseForm, date: d })
-                }
+                onChange={(d) => setExpenseForm({ ...expenseForm, date: d })}
               />
 
               <Input
                 label="Description"
                 value={expenseForm.description}
-                onChangeText={(t) =>
-                  setExpenseForm({ ...expenseForm, description: t })
-                }
+                onChangeText={(t) => setExpenseForm({ ...expenseForm, description: t })}
                 placeholder="Optional"
               />
 
-              {/* Receipt Photo Picker */}
               <PhotoPicker
                 label="Receipt Photo"
                 photoUri={expenseForm.photoUri}
@@ -686,16 +610,8 @@ export default function Expenses() {
               />
 
               <View style={styles.modalButtons}>
-                <Button
-                  title="Cancel"
-                  variant="secondary"
-                  onPress={() => setExpenseModal(false)}
-                />
-                <Button
-                  title="Save"
-                  onPress={handleSaveExpense}
-                  loading={saving}
-                />
+                <Button title="Cancel" variant="secondary" onPress={() => setExpenseModal(false)} />
+                <Button title="Save" onPress={handleSaveExpense} loading={saving} />
               </View>
             </View>
           </ScrollView>
@@ -704,22 +620,25 @@ export default function Expenses() {
 
       {/* ── Category Modal ─────────────────────────────────────────────── */}
       <Modal visible={categoryModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
+        <View style={[styles.modalOverlay, { backgroundColor: theme.colors.overlay }]}>
+          <View style={[
+            styles.modalContent,
+            { backgroundColor: theme.colors.modalBg },
+          ]}>
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
               {editingCategory ? 'Edit Category' : 'Add Category'}
             </Text>
 
             <Input
               label="Name *"
               value={categoryForm.name}
-              onChangeText={(t) =>
-                setCategoryForm({ ...categoryForm, name: t })
-              }
+              onChangeText={(t) => setCategoryForm({ ...categoryForm, name: t })}
               placeholder="e.g., Food"
             />
 
-            <Text style={styles.colorLabel}>Color</Text>
+            <Text style={[styles.colorLabel, { color: theme.colors.textSecondary }]}>
+              Color
+            </Text>
             <View style={styles.colorPicker}>
               {COLORS.map((c) => (
                 <TouchableOpacity
@@ -727,26 +646,19 @@ export default function Expenses() {
                   style={[
                     styles.colorOption,
                     { backgroundColor: c },
-                    categoryForm.color === c && styles.colorOptionActive,
+                    categoryForm.color === c && [
+                      styles.colorOptionActive,
+                      { borderColor: isDark ? '#fff' : '#111827' },
+                    ],
                   ]}
-                  onPress={() =>
-                    setCategoryForm({ ...categoryForm, color: c })
-                  }
+                  onPress={() => setCategoryForm({ ...categoryForm, color: c })}
                 />
               ))}
             </View>
 
             <View style={styles.modalButtons}>
-              <Button
-                title="Cancel"
-                variant="secondary"
-                onPress={() => setCategoryModal(false)}
-              />
-              <Button
-                title="Save"
-                onPress={handleSaveCategory}
-                loading={saving}
-              />
+              <Button title="Cancel" variant="secondary" onPress={() => setCategoryModal(false)} />
+              <Button title="Save" onPress={handleSaveCategory} loading={saving} />
             </View>
           </View>
         </View>
@@ -763,165 +675,70 @@ export default function Expenses() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f7fa' },
+  container: { flex: 1 },
 
-  tabs: {
-    flexDirection: 'row',
-    backgroundColor: '#e5e7eb',
-    margin: 16,
-    borderRadius: 8,
-    padding: 4,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 6,
-  },
-  activeTab: { backgroundColor: '#fff' },
-  tabText: { fontSize: 14, color: '#6b7280' },
-  activeTabText: { color: '#111827', fontWeight: '600' },
+  // Tabs
+  tabs: { flexDirection: 'row', margin: 16, borderRadius: 8, padding: 4 },
+  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 6 },
+  activeTab: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, elevation: 1 },
+  tabText: { fontSize: 14 },
 
-  empty: { textAlign: 'center', color: '#9ca3af', padding: 20 },
-
+  empty: { textAlign: 'center', padding: 20 },
   itemCard: { marginHorizontal: 16, marginBottom: 12 },
 
-  totalCard: {
-    marginHorizontal: 16,
-    marginBottom: 12,
-    alignItems: 'center',
-    backgroundColor: '#fef2f2',
-  },
-  totalLabel: { fontSize: 12, color: '#6b7280' },
-  totalValue: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#dc2626',
-    marginTop: 4,
-  },
+  // Total card
+  totalCard: { marginHorizontal: 16, marginBottom: 12, alignItems: 'center' },
+  totalLabel: { fontSize: 12 },
+  totalValue: { fontSize: 28, fontWeight: 'bold', marginTop: 4 },
 
   // Report button
-  reportButton: {
-    marginTop: 14,
-    backgroundColor: '#3b82f6',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    alignSelf: 'stretch',
-  },
-  reportButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
+  reportButton: { marginTop: 14, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 10, alignSelf: 'stretch' },
+  reportButtonContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   reportButtonIcon: { fontSize: 16 },
   reportButtonText: { color: '#fff', fontSize: 14, fontWeight: '600' },
 
   // Expense row
   expenseRow: { flexDirection: 'row', alignItems: 'flex-start' },
-
-  colorDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginTop: 4,
-    marginRight: 10,
-  },
-  largeColorDot: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    marginRight: 12,
-  },
+  colorDot: { width: 12, height: 12, borderRadius: 6, marginTop: 4, marginRight: 10 },
+  largeColorDot: { width: 24, height: 24, borderRadius: 12, marginRight: 12 },
 
   // Thumbnail
-  thumbnail: {
-    width: 56,
-    height: 56,
-    borderRadius: 8,
-    backgroundColor: '#e2e8f0',
-  },
+  thumbnail: { width: 56, height: 56, borderRadius: 8, backgroundColor: '#e2e8f0' },
   thumbnailBadge: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    elevation: 2,
+    position: 'absolute', bottom: -2, right: -2,
+    width: 20, height: 20, borderRadius: 10,
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15, shadowRadius: 2, elevation: 2,
   },
   thumbnailBadgeText: { fontSize: 10 },
 
-  expenseCategory: { fontSize: 15, fontWeight: '600', color: '#111827' },
-  expenseDate: { fontSize: 12, color: '#6b7280', marginTop: 2 },
-  expenseDesc: {
-    fontSize: 13,
-    color: '#6b7280',
-    marginTop: 4,
-    fontStyle: 'italic',
-  },
-  expenseAmount: { fontSize: 18, fontWeight: 'bold', color: '#dc2626' },
+  expenseCategory: { fontSize: 15, fontWeight: '600' },
+  expenseDate: { fontSize: 12, marginTop: 2 },
+  expenseDesc: { fontSize: 13, marginTop: 4, fontStyle: 'italic' },
+  expenseAmount: { fontSize: 18, fontWeight: 'bold' },
 
   actionButtons: { flexDirection: 'row', gap: 4, marginTop: 4 },
-  editBtn: { padding: 6, backgroundColor: '#dbeafe', borderRadius: 6 },
+  editBtn: { padding: 6, borderRadius: 6 },
   editBtnText: { fontSize: 14 },
   deleteBtn: { fontSize: 18, padding: 4 },
-
   addBtn: { marginHorizontal: 16, marginTop: 8 },
 
+  // Category row
   categoryRow: { flexDirection: 'row', alignItems: 'center' },
-  categoryName: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#111827',
-  },
+  categoryName: { flex: 1, fontSize: 16, fontWeight: '500' },
 
-  colorLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  colorPicker: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 16,
-  },
+  // Color picker
+  colorLabel: { fontSize: 14, fontWeight: '500', marginBottom: 8 },
+  colorPicker: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 16 },
   colorOption: { width: 40, height: 40, borderRadius: 20 },
-  colorOptionActive: { borderWidth: 3, borderColor: '#111827' },
+  colorOptionActive: { borderWidth: 3 },
 
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '90%',
-  },
-  modalScrollContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '92%',
-  },
-  modalInner: {
-    padding: 20,
-    paddingBottom: 40,
-  },
+  // Modal
+  modalOverlay: { flex: 1, justifyContent: 'flex-end' },
+  modalContent: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '90%' },
+  modalScrollContent: { borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '92%' },
+  modalInner: { padding: 20, paddingBottom: 40 },
   modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 16 },
   modalButtons: { flexDirection: 'row', gap: 12, marginTop: 16 },
 });

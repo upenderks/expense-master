@@ -1,15 +1,23 @@
 import { Tabs } from 'expo-router';
 import { Text } from 'react-native';
+import { useTheme } from '../../src/context/ThemeContext';
 
 export default function TabLayout() {
+  const { theme } = useTheme();
+
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#3b82f6',
-        tabBarInactiveTintColor: '#9ca3af',
-        headerStyle: { backgroundColor: '#fff' },
-        headerTitleStyle: { fontWeight: '600' },
-        tabBarStyle: { paddingBottom: 5, height: 60 },
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.muted,
+        headerStyle: { backgroundColor: theme.colors.surface },
+        headerTitleStyle: { fontWeight: '600', color: theme.colors.text },
+        tabBarStyle: {
+          paddingBottom: 5,
+          height: 60,
+          backgroundColor: theme.colors.tabBar,
+          borderTopColor: theme.colors.tabBarBorder,
+        },
         tabBarLabelStyle: { fontSize: 11 },
       }}
     >
@@ -17,28 +25,28 @@ export default function TabLayout() {
         name="dashboard"
         options={{
           title: 'Dashboard',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 22 }}>📊</Text>,
+          tabBarIcon: () => <Text style={{ fontSize: 22 }}>📊</Text>,
         }}
       />
       <Tabs.Screen
         name="money"
         options={{
           title: 'Money',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 22 }}>💰</Text>,
+          tabBarIcon: () => <Text style={{ fontSize: 22 }}>💰</Text>,
         }}
       />
       <Tabs.Screen
         name="expenses"
         options={{
           title: 'Expenses',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 22 }}>💸</Text>,
+          tabBarIcon: () => <Text style={{ fontSize: 22 }}>💸</Text>,
         }}
       />
       <Tabs.Screen
         name="more"
         options={{
           title: 'More',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 22 }}>⚙️</Text>,
+          tabBarIcon: () => <Text style={{ fontSize: 22 }}>⚙️</Text>,
         }}
       />
     </Tabs>

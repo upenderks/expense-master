@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
+import { useTheme } from '../../src/context/ThemeContext';
 import {
   getBorrowers,
   getTransactions,
@@ -32,26 +33,21 @@ type Tab = 'borrowers' | 'transactions';
 
 export default function Money() {
   const { user } = useAuth();
+  const { theme, isDark } = useTheme();
+
   const [activeTab, setActiveTab] = useState<Tab>('borrowers');
   const [borrowers, setBorrowers] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
-
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-
   const [borrowerModal, setBorrowerModal] = useState(false);
   const [editingBorrower, setEditingBorrower] = useState<any>(null);
   const [transactionModal, setTransactionModal] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<any>(null);
-
   const [borrowerForm, setBorrowerForm] = useState({
-    name: '',
-    phone: '',
-    email: '',
-    address: '',
-    notes: '',
+    name: '', phone: '', email: '', address: '', notes: '',
   });
   const [transactionForm, setTransactionForm] = useState({
     borrowerId: '' as number | string,
@@ -65,13 +61,9 @@ export default function Money() {
   const loadData = async () => {
     if (!user) return;
     try {
-      const filters =
-        startDate || endDate
-          ? {
-              startDate: startDate || undefined,
-              endDate: endDate || undefined,
-            }
-          : undefined;
+      const filters = startDate || endDate
+        ? { startDate: startDate || undefined, endDate: endDate || undefined }
+        : undefined;
       const [borrowersData, transactionsData] = await Promise.all([
         getBorrowers(user.id),
         getTransactions(user.id, filters),
@@ -85,11 +77,7 @@ export default function Money() {
     }
   };
 
-  useFocusEffect(
-    useCallback(() => {
-      loadData();
-    }, [user, startDate, endDate])
-  );
+  useFocusEffect(useCallback(() => { loadData(); }, [user, startDate, endDate]));
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -106,21 +94,13 @@ export default function Money() {
     if (borrower) {
       setEditingBorrower(borrower);
       setBorrowerForm({
-        name: borrower.name,
-        phone: borrower.phone || '',
-        email: borrower.email || '',
-        address: borrower.address || '',
+        name: borrower.name, phone: borrower.phone || '',
+        email: borrower.email || '', address: borrower.address || '',
         notes: borrower.notes || '',
       });
     } else {
       setEditingBorrower(null);
-      setBorrowerForm({
-        name: '',
-        phone: '',
-        email: '',
-        address: '',
-        notes: '',
-      });
+      setBorrowerForm({ name: '', phone: '', email: '', address: '', notes: '' });
     }
     setBorrowerModal(true);
   };
@@ -133,24 +113,9 @@ export default function Money() {
     setSaving(true);
     try {
       if (editingBorrower) {
-        await updateBorrower(
-          editingBorrower.id,
-          user!.id,
-          borrowerForm.name,
-          borrowerForm.phone,
-          borrowerForm.email,
-          borrowerForm.address,
-          borrowerForm.notes
-        );
+        await updateBorrower(editingBorrower.id, user!.id, borrowerForm.name, borrowerForm.phone, borrowerForm.email, borrowerForm.address, borrowerForm.notes);
       } else {
-        await createBorrower(
-          user!.id,
-          borrowerForm.name,
-          borrowerForm.phone,
-          borrowerForm.email,
-          borrowerForm.address,
-          borrowerForm.notes
-        );
+        await createBorrower(user!.id, borrowerForm.name, borrowerForm.phone, borrowerForm.email, borrowerForm.address, borrowerForm.notes);
       }
       setBorrowerModal(false);
       loadData();
@@ -162,41 +127,28 @@ export default function Money() {
   };
 
   const handleDeleteBorrower = (id: number, name: string) => {
-    Alert.alert(
-      'Delete Borrower',
-      `Delete ${name}? This will also delete all transactions.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            await deleteBorrower(id, user!.id);
-            loadData();
-          },
-        },
-      ]
-    );
+    Alert.alert('Delete Borrower', `Delete ${name}? This will also delete all transactions.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive',
+        onPress: async () => { await deleteBorrower(id, user!.id); loadData(); },
+      },
+    ]);
   };
 
   const openTransactionModal = (transaction?: any) => {
     if (transaction) {
       setEditingTransaction(transaction);
       setTransactionForm({
-        borrowerId: transaction.borrower_id,
-        type: transaction.type,
-        amount: transaction.amount.toString(),
-        date: transaction.date,
+        borrowerId: transaction.borrower_id, type: transaction.type,
+        amount: transaction.amount.toString(), date: transaction.date,
         description: transaction.description || '',
       });
     } else {
       setEditingTransaction(null);
       setTransactionForm({
-        borrowerId: '',
-        type: 'given',
-        amount: '',
-        date: new Date().toISOString().split('T')[0],
-        description: '',
+        borrowerId: '', type: 'given', amount: '',
+        date: new Date().toISOString().split('T')[0], description: '',
       });
     }
     setTransactionModal(true);
@@ -210,24 +162,9 @@ export default function Money() {
     setSaving(true);
     try {
       if (editingTransaction) {
-        await updateTransaction(
-          editingTransaction.id,
-          user!.id,
-          Number(transactionForm.borrowerId),
-          transactionForm.type,
-          parseFloat(transactionForm.amount),
-          transactionForm.date,
-          transactionForm.description
-        );
+        await updateTransaction(editingTransaction.id, user!.id, Number(transactionForm.borrowerId), transactionForm.type, parseFloat(transactionForm.amount), transactionForm.date, transactionForm.description);
       } else {
-        await createTransaction(
-          user!.id,
-          Number(transactionForm.borrowerId),
-          transactionForm.type,
-          parseFloat(transactionForm.amount),
-          transactionForm.date,
-          transactionForm.description
-        );
+        await createTransaction(user!.id, Number(transactionForm.borrowerId), transactionForm.type, parseFloat(transactionForm.amount), transactionForm.date, transactionForm.description);
       }
       setTransactionModal(false);
       loadData();
@@ -242,12 +179,8 @@ export default function Money() {
     Alert.alert('Delete Transaction', 'Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          await deleteTransaction(id, user!.id);
-          loadData();
-        },
+        text: 'Delete', style: 'destructive',
+        onPress: async () => { await deleteTransaction(id, user!.id); loadData(); },
       },
     ]);
   };
@@ -255,58 +188,54 @@ export default function Money() {
   const formatCurrency = (amount: number) =>
     '₹' + amount.toLocaleString('en-IN', { maximumFractionDigits: 0 });
 
-  const totalGiven = transactions
-    .filter((t) => t.type === 'given')
-    .reduce((s, t) => s + t.amount, 0);
-  const totalReceived = transactions
-    .filter((t) => t.type === 'received')
-    .reduce((s, t) => s + t.amount, 0);
+  const totalGiven = transactions.filter(t => t.type === 'given').reduce((s, t) => s + t.amount, 0);
+  const totalReceived = transactions.filter(t => t.type === 'received').reduce((s, t) => s + t.amount, 0);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+
       {/* Tabs */}
-      <View style={styles.tabs}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'borrowers' && styles.activeTab]}
-          onPress={() => setActiveTab('borrowers')}
-        >
-          <Text
+      <View style={[
+        styles.tabs,
+        { backgroundColor: isDark ? '#334155' : '#e5e7eb' },
+      ]}>
+        {(['borrowers', 'transactions'] as Tab[]).map((tab) => (
+          <TouchableOpacity
+            key={tab}
             style={[
-              styles.tabText,
-              activeTab === 'borrowers' && styles.activeTabText,
+              styles.tab,
+              activeTab === tab && [
+                styles.activeTab,
+                { backgroundColor: theme.colors.surface },
+              ],
             ]}
+            onPress={() => setActiveTab(tab)}
           >
-            👥 Borrowers
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.tab,
-            activeTab === 'transactions' && styles.activeTab,
-          ]}
-          onPress={() => setActiveTab('transactions')}
-        >
-          <Text
-            style={[
+            <Text style={[
               styles.tabText,
-              activeTab === 'transactions' && styles.activeTabText,
-            ]}
-          >
-            💱 Transactions
-          </Text>
-        </TouchableOpacity>
+              { color: theme.colors.muted },
+              activeTab === tab && { color: theme.colors.text, fontWeight: '600' },
+            ]}>
+              {tab === 'borrowers' ? '👥 Borrowers' : '💱 Transactions'}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       <ScrollView
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={theme.colors.primary}
+          />
         }
       >
         {activeTab === 'borrowers' ? (
           <>
             {borrowers.length === 0 ? (
               <Card>
-                <Text style={styles.empty}>
+                <Text style={[styles.empty, { color: theme.colors.muted }]}>
                   No borrowers yet. Tap + to add one.
                 </Text>
               </Card>
@@ -319,35 +248,49 @@ export default function Money() {
                 >
                   <Card style={styles.itemCard}>
                     <View style={styles.borrowerHeader}>
-                      <View style={styles.avatar}>
+                      {/* Avatar */}
+                      <View style={[styles.avatar, { backgroundColor: theme.colors.primary }]}>
                         <Text style={styles.avatarText}>
                           {b.name.charAt(0).toUpperCase()}
                         </Text>
                       </View>
+
                       <View style={{ flex: 1, marginLeft: 12 }}>
-                        <Text style={styles.borrowerName}>{b.name}</Text>
+                        <Text style={[styles.borrowerName, { color: theme.colors.text }]}>
+                          {b.name}
+                        </Text>
                         {b.phone && (
-                          <Text style={styles.borrowerMeta}>
+                          <Text style={[styles.borrowerMeta, { color: theme.colors.muted }]}>
                             📞 {b.phone}
                           </Text>
                         )}
                       </View>
-                      <View style={styles.chevron}>
-                        <Text style={styles.chevronText}>›</Text>
+
+                      {/* Chevron */}
+                      <View style={[
+                        styles.chevron,
+                        { backgroundColor: isDark ? '#334155' : '#f3f4f6' },
+                      ]}>
+                        <Text style={[styles.chevronText, { color: theme.colors.muted }]}>
+                          ›
+                        </Text>
                       </View>
                     </View>
-                    <View style={styles.balanceRow}>
-                      <Text style={styles.balanceLabel}>Balance:</Text>
-                      <Text
-                        style={[
-                          styles.balanceAmount,
-                          b.balance > 0
-                            ? styles.positive
-                            : b.balance < 0
-                            ? styles.negative
-                            : styles.neutral,
-                        ]}
-                      >
+
+                    {/* Balance Row */}
+                    <View style={[
+                      styles.balanceRow,
+                      { borderTopColor: theme.colors.border },
+                    ]}>
+                      <Text style={[styles.balanceLabel, { color: theme.colors.muted }]}>
+                        Balance:
+                      </Text>
+                      <Text style={[
+                        styles.balanceAmount,
+                        b.balance > 0 ? styles.positive
+                          : b.balance < 0 ? styles.negative
+                          : { color: theme.colors.muted },
+                      ]}>
                         {b.balance > 0
                           ? `Owes ${formatCurrency(b.balance)}`
                           : b.balance < 0
@@ -355,7 +298,10 @@ export default function Money() {
                           : 'Settled'}
                       </Text>
                     </View>
-                    <Text style={styles.tapHint}>Tap to view details →</Text>
+
+                    <Text style={[styles.tapHint, { color: theme.colors.primary }]}>
+                      Tap to view details →
+                    </Text>
                   </Card>
                 </TouchableOpacity>
               ))
@@ -368,37 +314,36 @@ export default function Money() {
           </>
         ) : (
           <>
+            {/* Date Filter */}
             <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
               <DateRangeFilter
                 startDate={startDate}
                 endDate={endDate}
-                onChange={(s, e) => {
-                  setStartDate(s);
-                  setEndDate(e);
-                }}
+                onChange={(s, e) => { setStartDate(s); setEndDate(e); }}
                 onClear={clearDateFilter}
               />
             </View>
 
+            {/* Summary Cards */}
             <View style={styles.summaryRow}>
-              <Card
-                style={[
-                  styles.summaryCard,
-                  { backgroundColor: '#fef2f2' },
-                ]}
-              >
-                <Text style={styles.summaryLabel}>Given</Text>
+              <Card style={[
+                styles.summaryCard,
+                { backgroundColor: isDark ? theme.colors.dangerSoft : '#fef2f2' },
+              ]}>
+                <Text style={[styles.summaryLabel, { color: theme.colors.muted }]}>
+                  Given
+                </Text>
                 <Text style={[styles.summaryValue, { color: '#dc2626' }]}>
                   {formatCurrency(totalGiven)}
                 </Text>
               </Card>
-              <Card
-                style={[
-                  styles.summaryCard,
-                  { backgroundColor: '#ecfdf5' },
-                ]}
-              >
-                <Text style={styles.summaryLabel}>Received</Text>
+              <Card style={[
+                styles.summaryCard,
+                { backgroundColor: isDark ? theme.colors.successSoft : '#ecfdf5' },
+              ]}>
+                <Text style={[styles.summaryLabel, { color: theme.colors.muted }]}>
+                  Received
+                </Text>
                 <Text style={[styles.summaryValue, { color: '#059669' }]}>
                   {formatCurrency(totalReceived)}
                 </Text>
@@ -407,9 +352,8 @@ export default function Money() {
 
             {transactions.length === 0 ? (
               <Card>
-                <Text style={styles.empty}>
-                  No transactions{' '}
-                  {startDate || endDate ? 'in this date range' : 'yet'}
+                <Text style={[styles.empty, { color: theme.colors.muted }]}>
+                  No transactions {startDate || endDate ? 'in this date range' : 'yet'}
                 </Text>
               </Card>
             ) : (
@@ -417,45 +361,40 @@ export default function Money() {
                 <Card key={t.id} style={styles.itemCard}>
                   <View style={styles.transactionHeader}>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.transactionName}>
+                      <Text style={[styles.transactionName, { color: theme.colors.text }]}>
                         {t.borrower_name}
                       </Text>
-                      <Text style={styles.transactionType}>
-                        {t.type === 'given'
-                          ? '💸 Money Given'
-                          : '💰 Money Received'}
+                      <Text style={[styles.transactionType, { color: theme.colors.muted }]}>
+                        {t.type === 'given' ? '💸 Money Given' : '💰 Money Received'}
                       </Text>
-                      <Text style={styles.transactionDate}>
+                      <Text style={[styles.transactionDate, { color: theme.colors.muted }]}>
                         📅 {t.date}
                       </Text>
                       {t.description && (
-                        <Text style={styles.transactionDesc}>
+                        <Text style={[styles.transactionDesc, { color: theme.colors.muted }]}>
                           {t.description}
                         </Text>
                       )}
                     </View>
+
                     <View style={{ alignItems: 'flex-end' }}>
-                      <Text
-                        style={[
-                          styles.transactionAmount,
-                          t.type === 'given'
-                            ? styles.negative
-                            : styles.positive,
-                        ]}
-                      >
-                        {t.type === 'given' ? '-' : '+'}
-                        {formatCurrency(t.amount)}
+                      <Text style={[
+                        styles.transactionAmount,
+                        t.type === 'given' ? styles.negative : styles.positive,
+                      ]}>
+                        {t.type === 'given' ? '-' : '+'}{formatCurrency(t.amount)}
                       </Text>
                       <View style={styles.actionButtons}>
                         <TouchableOpacity
                           onPress={() => openTransactionModal(t)}
-                          style={styles.editBtn}
+                          style={[
+                            styles.editBtn,
+                            { backgroundColor: isDark ? '#1e3a5f' : '#dbeafe' },
+                          ]}
                         >
                           <Text style={styles.editBtnText}>✏️</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity
-                          onPress={() => handleDeleteTransaction(t.id)}
-                        >
+                        <TouchableOpacity onPress={() => handleDeleteTransaction(t.id)}>
                           <Text style={styles.deleteBtn}>🗑️</Text>
                         </TouchableOpacity>
                       </View>
@@ -474,168 +413,103 @@ export default function Money() {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Borrower Modal */}
+      {/* ── Borrower Modal ─────────────────────────────────────────── */}
       <Modal visible={borrowerModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {editingBorrower ? 'Edit Borrower' : 'Add Borrower'}
-            </Text>
-            <Input
-              label="Name *"
-              value={borrowerForm.name}
-              onChangeText={(t) =>
-                setBorrowerForm({ ...borrowerForm, name: t })
-              }
-              placeholder="Name"
-            />
-            <Input
-              label="Phone"
-              value={borrowerForm.phone}
-              onChangeText={(t) =>
-                setBorrowerForm({ ...borrowerForm, phone: t })
-              }
-              placeholder="Phone"
-              keyboardType="phone-pad"
-            />
-            <Input
-              label="Email"
-              value={borrowerForm.email}
-              onChangeText={(t) =>
-                setBorrowerForm({ ...borrowerForm, email: t })
-              }
-              placeholder="Email"
-            />
-            <Input
-              label="Address"
-              value={borrowerForm.address}
-              onChangeText={(t) =>
-                setBorrowerForm({ ...borrowerForm, address: t })
-              }
-              placeholder="Address"
-            />
-            <Input
-              label="Notes"
-              value={borrowerForm.notes}
-              onChangeText={(t) =>
-                setBorrowerForm({ ...borrowerForm, notes: t })
-              }
-              placeholder="Notes"
-            />
-            <View style={styles.modalButtons}>
-              <Button
-                title="Cancel"
-                variant="secondary"
-                onPress={() => setBorrowerModal(false)}
-              />
-              <Button
-                title="Save"
-                onPress={handleSaveBorrower}
-                loading={saving}
-              />
+        <View style={[styles.modalOverlay, { backgroundColor: theme.colors.overlay }]}>
+          <ScrollView
+            style={[styles.modalContent, { backgroundColor: theme.colors.modalBg }]}
+            bounces={false}
+          >
+            <View style={styles.modalInner}>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+                {editingBorrower ? 'Edit Borrower' : 'Add Borrower'}
+              </Text>
+              <Input label="Name *" value={borrowerForm.name} onChangeText={(t) => setBorrowerForm({ ...borrowerForm, name: t })} placeholder="Name" />
+              <Input label="Phone" value={borrowerForm.phone} onChangeText={(t) => setBorrowerForm({ ...borrowerForm, phone: t })} placeholder="Phone" keyboardType="phone-pad" />
+              <Input label="Email" value={borrowerForm.email} onChangeText={(t) => setBorrowerForm({ ...borrowerForm, email: t })} placeholder="Email" />
+              <Input label="Address" value={borrowerForm.address} onChangeText={(t) => setBorrowerForm({ ...borrowerForm, address: t })} placeholder="Address" />
+              <Input label="Notes" value={borrowerForm.notes} onChangeText={(t) => setBorrowerForm({ ...borrowerForm, notes: t })} placeholder="Notes" />
+              <View style={styles.modalButtons}>
+                <Button title="Cancel" variant="secondary" onPress={() => setBorrowerModal(false)} />
+                <Button title="Save" onPress={handleSaveBorrower} loading={saving} />
+              </View>
             </View>
-          </View>
+          </ScrollView>
         </View>
       </Modal>
 
-      {/* Transaction Modal */}
+      {/* ── Transaction Modal ──────────────────────────────────────── */}
       <Modal visible={transactionModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
+        <View style={[styles.modalOverlay, { backgroundColor: theme.colors.overlay }]}>
+          <View style={[styles.modalContent, { backgroundColor: theme.colors.modalBg }]}>
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
               {editingTransaction ? 'Edit Transaction' : 'Add Transaction'}
             </Text>
+
             <Select
               label="Borrower"
               value={transactionForm.borrowerId}
-              onChange={(v) =>
-                setTransactionForm({ ...transactionForm, borrowerId: v })
-              }
-              options={borrowers.map((b) => ({
-                value: b.id,
-                label: b.name,
-              }))}
+              onChange={(v) => setTransactionForm({ ...transactionForm, borrowerId: v })}
+              options={borrowers.map((b) => ({ value: b.id, label: b.name }))}
             />
+
+            {/* Type Toggle */}
             <View style={styles.typeToggle}>
               <TouchableOpacity
                 style={[
                   styles.typeButton,
+                  { backgroundColor: isDark ? '#334155' : '#e5e7eb' },
                   transactionForm.type === 'given' && styles.typeActive,
                 ]}
-                onPress={() =>
-                  setTransactionForm({ ...transactionForm, type: 'given' })
-                }
+                onPress={() => setTransactionForm({ ...transactionForm, type: 'given' })}
               >
-                <Text
-                  style={[
-                    styles.typeText,
-                    transactionForm.type === 'given' && styles.typeTextActive,
-                  ]}
-                >
+                <Text style={[
+                  styles.typeText,
+                  { color: theme.colors.muted },
+                  transactionForm.type === 'given' && styles.typeTextActive,
+                ]}>
                   💸 Given
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
                   styles.typeButton,
+                  { backgroundColor: isDark ? '#334155' : '#e5e7eb' },
                   transactionForm.type === 'received' && styles.typeActive,
                 ]}
-                onPress={() =>
-                  setTransactionForm({
-                    ...transactionForm,
-                    type: 'received',
-                  })
-                }
+                onPress={() => setTransactionForm({ ...transactionForm, type: 'received' })}
               >
-                <Text
-                  style={[
-                    styles.typeText,
-                    transactionForm.type === 'received' &&
-                      styles.typeTextActive,
-                  ]}
-                >
+                <Text style={[
+                  styles.typeText,
+                  { color: theme.colors.muted },
+                  transactionForm.type === 'received' && styles.typeTextActive,
+                ]}>
                   💰 Received
                 </Text>
               </TouchableOpacity>
             </View>
+
             <Input
               label="Amount"
               value={transactionForm.amount}
-              onChangeText={(t) =>
-                setTransactionForm({ ...transactionForm, amount: t })
-              }
+              onChangeText={(t) => setTransactionForm({ ...transactionForm, amount: t })}
               placeholder="0"
               keyboardType="numeric"
             />
             <DatePicker
               label="Date"
               value={transactionForm.date}
-              onChange={(d) =>
-                setTransactionForm({ ...transactionForm, date: d })
-              }
+              onChange={(d) => setTransactionForm({ ...transactionForm, date: d })}
             />
             <Input
               label="Description"
               value={transactionForm.description}
-              onChangeText={(t) =>
-                setTransactionForm({
-                  ...transactionForm,
-                  description: t,
-                })
-              }
+              onChangeText={(t) => setTransactionForm({ ...transactionForm, description: t })}
               placeholder="Optional description"
             />
             <View style={styles.modalButtons}>
-              <Button
-                title="Cancel"
-                variant="secondary"
-                onPress={() => setTransactionModal(false)}
-              />
-              <Button
-                title="Save"
-                onPress={handleSaveTransaction}
-                loading={saving}
-              />
+              <Button title="Cancel" variant="secondary" onPress={() => setTransactionModal(false)} />
+              <Button title="Save" onPress={handleSaveTransaction} loading={saving} />
             </View>
           </View>
         </View>
@@ -645,117 +519,66 @@ export default function Money() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f7fa' },
-  tabs: {
-    flexDirection: 'row',
-    backgroundColor: '#e5e7eb',
-    margin: 16,
-    borderRadius: 8,
-    padding: 4,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 6,
-  },
-  activeTab: { backgroundColor: '#fff' },
-  tabText: { fontSize: 14, color: '#6b7280' },
-  activeTabText: { color: '#111827', fontWeight: '600' },
-  empty: { textAlign: 'center', color: '#9ca3af', padding: 20 },
+  container: { flex: 1 },
+
+  // Tabs
+  tabs: { flexDirection: 'row', margin: 16, borderRadius: 8, padding: 4 },
+  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 6 },
+  activeTab: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, elevation: 1 },
+  tabText: { fontSize: 14 },
+
+  empty: { textAlign: 'center', padding: 20 },
   itemCard: { marginHorizontal: 16, marginBottom: 12 },
+
+  // Borrower
   borrowerHeader: { flexDirection: 'row', alignItems: 'center' },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#3b82f6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  avatar: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center' },
   avatarText: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
-  borrowerName: { fontSize: 16, fontWeight: '600', color: '#111827' },
-  borrowerMeta: { fontSize: 13, color: '#6b7280', marginTop: 2 },
-  chevron: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#f3f4f6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  chevronText: { fontSize: 20, color: '#9ca3af', fontWeight: '300' },
-  actionButtons: { flexDirection: 'row', gap: 4 },
-  editBtn: { padding: 6, backgroundColor: '#dbeafe', borderRadius: 6 },
-  editBtnText: { fontSize: 14 },
-  deleteBtn: { fontSize: 18, padding: 4 },
-  balanceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
-  },
-  balanceLabel: { fontSize: 14, color: '#6b7280' },
+  borrowerName: { fontSize: 16, fontWeight: '600' },
+  borrowerMeta: { fontSize: 13, marginTop: 2 },
+  chevron: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  chevronText: { fontSize: 20, fontWeight: '300' },
+  balanceRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12, paddingTop: 12, borderTopWidth: 1 },
+  balanceLabel: { fontSize: 14 },
   balanceAmount: { fontSize: 14, fontWeight: '600' },
+  tapHint: { fontSize: 12, marginTop: 8, fontWeight: '500' },
+
   positive: { color: '#059669' },
   negative: { color: '#dc2626' },
   neutral: { color: '#6b7280' },
-  tapHint: {
-    fontSize: 12,
-    color: '#3b82f6',
-    marginTop: 8,
-    fontWeight: '500',
-  },
+
   addBtn: { marginHorizontal: 16, marginTop: 8 },
-  summaryRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    gap: 12,
-    marginBottom: 12,
-  },
+
+  // Summary
+  summaryRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 12, marginBottom: 12 },
   summaryCard: { flex: 1, alignItems: 'center', padding: 12 },
-  summaryLabel: { fontSize: 12, color: '#6b7280' },
+  summaryLabel: { fontSize: 12 },
   summaryValue: { fontSize: 18, fontWeight: 'bold', marginTop: 4 },
-  transactionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  transactionName: { fontSize: 15, fontWeight: '600', color: '#111827' },
-  transactionType: { fontSize: 13, color: '#6b7280', marginTop: 2 },
-  transactionDate: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
-  transactionDesc: {
-    fontSize: 13,
-    color: '#6b7280',
-    marginTop: 4,
-    fontStyle: 'italic',
-  },
+
+  // Transaction
+  transactionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  transactionName: { fontSize: 15, fontWeight: '600' },
+  transactionType: { fontSize: 13, marginTop: 2 },
+  transactionDate: { fontSize: 12, marginTop: 2 },
+  transactionDesc: { fontSize: 13, marginTop: 4, fontStyle: 'italic' },
   transactionAmount: { fontSize: 18, fontWeight: 'bold' },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '90%',
-  },
+
+  actionButtons: { flexDirection: 'row', gap: 4 },
+  editBtn: { padding: 6, borderRadius: 6 },
+  editBtnText: { fontSize: 14 },
+  deleteBtn: { fontSize: 18, padding: 4 },
+
+  // Modal
+  modalOverlay: { flex: 1, justifyContent: 'flex-end' },
+  modalContent: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '90%' },
+  modalInner: { paddingBottom: 40 },
   modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 16 },
   modalButtons: { flexDirection: 'row', gap: 12, marginTop: 16 },
+
+  // Type toggle
   typeToggle: { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  typeButton: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderRadius: 8,
-    backgroundColor: '#e5e7eb',
-  },
+  typeButton: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 8 },
   typeActive: { backgroundColor: '#3b82f6' },
-  typeText: { fontSize: 14, fontWeight: '500', color: '#6b7280' },
+  typeText: { fontSize: 14, fontWeight: '500' },
   typeTextActive: { color: '#fff' },
 });

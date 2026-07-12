@@ -8,7 +8,7 @@ import {
   Platform,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { theme } from '../theme';
+import { useTheme } from '../context/ThemeContext';
 
 interface DateRangeFilterProps {
   startDate: string;
@@ -19,19 +19,16 @@ interface DateRangeFilterProps {
   autoSetDefaults?: boolean;
 }
 
-// Helper: get date string in YYYY-MM-DD format
 function getDateString(date: Date): string {
   return date.toISOString().split('T')[0];
 }
 
-// Helper: get date 30 days ago
 function getDefault30DaysAgo(): string {
   const d = new Date();
   d.setDate(d.getDate() - 30);
   return getDateString(d);
 }
 
-// Helper: get today's date
 function getToday(): string {
   return getDateString(new Date());
 }
@@ -44,9 +41,9 @@ export default function DateRangeFilter({
   title,
   autoSetDefaults = true,
 }: DateRangeFilterProps) {
+  const { theme, isDark } = useTheme();
   const [showPicker, setShowPicker] = useState<'start' | 'end' | null>(null);
 
-  // Set default 30-day range if both are empty
   useEffect(() => {
     if (autoSetDefaults && !startDate && !endDate) {
       onChange(getDefault30DaysAgo(), getToday());
@@ -71,11 +68,8 @@ export default function DateRangeFilter({
     if (Platform.OS === 'android') {
       setShowPicker(null);
     }
-
     if (!selectedDate) return;
-
     const formatted = getDateString(selectedDate);
-
     if (showPicker === 'start') {
       onChange(formatted, endDate);
     } else if (showPicker === 'end') {
@@ -83,9 +77,7 @@ export default function DateRangeFilter({
     }
   };
 
-  const handleDone = () => {
-    setShowPicker(null);
-  };
+  const handleDone = () => setShowPicker(null);
 
   const hasFilter = startDate || endDate;
 
@@ -96,53 +88,106 @@ export default function DateRangeFilter({
   };
 
   return (
-    <View style={styles.container}>
-      {/* Header row */}
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor: theme.colors.surface,
+          borderColor: theme.colors.border,
+          shadowColor: theme.colors.shadow,
+        },
+      ]}
+    >
+      {/* Header Row */}
       <View style={styles.headerRow}>
-        {title && <Text style={styles.title}>{title}</Text>}
+        {title && (
+          <Text style={[styles.title, { color: theme.colors.text }]}>
+            {title}
+          </Text>
+        )}
         {hasFilter && onClear && (
           <TouchableOpacity onPress={onClear} activeOpacity={0.7}>
-            <Text style={styles.clearText}>✕ Clear</Text>
+            <Text style={[styles.clearText, { color: theme.colors.danger }]}>
+              ✕ Clear
+            </Text>
           </TouchableOpacity>
         )}
       </View>
 
-      {/* Date buttons row */}
+      {/* Date Buttons Row */}
       <View style={styles.dateRow}>
+        {/* From Button */}
         <TouchableOpacity
           style={[
             styles.dateButton,
-            startDate && styles.dateButtonActive,
+            {
+              backgroundColor: startDate
+                ? isDark
+                  ? theme.colors.primarySoft
+                  : theme.colors.primarySoft
+                : isDark
+                ? '#1e293b'
+                : '#f8fafc',
+              borderColor: startDate
+                ? theme.colors.primary
+                : theme.colors.inputBorder,
+            },
           ]}
           onPress={() => setShowPicker('start')}
           activeOpacity={0.7}
         >
-          <Text style={styles.dateLabel}>From</Text>
+          <Text style={[styles.dateLabel, { color: theme.colors.muted }]}>
+            From
+          </Text>
           <Text
             style={[
               styles.dateValue,
-              startDate && styles.dateValueActive,
+              {
+                color: startDate
+                  ? theme.colors.primary
+                  : theme.colors.muted,
+              },
             ]}
           >
             {formatDisplay(startDate)}
           </Text>
         </TouchableOpacity>
 
-        <Text style={styles.dateSeparator}>→</Text>
+        <Text style={[styles.dateSeparator, { color: theme.colors.muted }]}>
+          →
+        </Text>
 
+        {/* To Button */}
         <TouchableOpacity
           style={[
             styles.dateButton,
-            endDate && styles.dateButtonActive,
+            {
+              backgroundColor: endDate
+                ? isDark
+                  ? theme.colors.primarySoft
+                  : theme.colors.primarySoft
+                : isDark
+                ? '#1e293b'
+                : '#f8fafc',
+              borderColor: endDate
+                ? theme.colors.primary
+                : theme.colors.inputBorder,
+            },
           ]}
           onPress={() => setShowPicker('end')}
           activeOpacity={0.7}
         >
-          <Text style={styles.dateLabel}>To</Text>
+          <Text style={[styles.dateLabel, { color: theme.colors.muted }]}>
+            To
+          </Text>
           <Text
             style={[
               styles.dateValue,
-              endDate && styles.dateValueActive,
+              {
+                color: endDate
+                  ? theme.colors.primary
+                  : theme.colors.muted,
+              },
             ]}
           >
             {formatDisplay(endDate)}
@@ -150,7 +195,7 @@ export default function DateRangeFilter({
         </TouchableOpacity>
       </View>
 
-      {/* Android DatePicker */}
+      {/* Android Picker */}
       {showPicker && Platform.OS === 'android' && (
         <DateTimePicker
           value={getPickerDate()}
@@ -160,23 +205,49 @@ export default function DateRangeFilter({
         />
       )}
 
-      {/* iOS DatePicker Modal */}
+      {/* iOS Picker Modal */}
       {showPicker && Platform.OS === 'ios' && (
         <Modal transparent animationType="fade">
           <TouchableOpacity
-            style={styles.modalOverlay}
+            style={[
+              styles.modalOverlay,
+              { backgroundColor: theme.colors.overlay },
+            ]}
             activeOpacity={1}
             onPress={handleDone}
           >
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>
+            <View
+              style={[
+                styles.modalContent,
+                {
+                  backgroundColor: theme.colors.modalBg,
+                  borderColor: theme.colors.border,
+                  borderWidth: isDark ? 1 : 0,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.modalHeader,
+                  { borderBottomColor: theme.colors.border },
+                ]}
+              >
+                <Text
+                  style={[styles.modalTitle, { color: theme.colors.text }]}
+                >
                   {showPicker === 'start' ? 'From Date' : 'To Date'}
                 </Text>
-                <TouchableOpacity onPress={handleDone}>
-                  <Text style={styles.modalDone}>Done</Text>
+                <TouchableOpacity
+                  onPress={handleDone}
+                  style={[
+                    styles.doneButton,
+                    { backgroundColor: theme.colors.primary },
+                  ]}
+                >
+                  <Text style={styles.doneButtonText}>Done</Text>
                 </TouchableOpacity>
               </View>
+
               <DateTimePicker
                 value={getPickerDate()}
                 mode="date"
@@ -194,12 +265,9 @@ export default function DateRangeFilter({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.md,
+    borderRadius: 12,
     padding: 12,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    shadowColor: theme.colors.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 6,
@@ -216,12 +284,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 13,
     fontWeight: '700',
-    color: theme.colors.text,
   },
   clearText: {
     fontSize: 12,
     fontWeight: '600',
-    color: theme.colors.danger,
   },
 
   // Date row
@@ -232,21 +298,14 @@ const styles = StyleSheet.create({
   },
   dateButton: {
     flex: 1,
-    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: theme.colors.inputBorder,
-    borderRadius: theme.radius.sm,
+    borderRadius: 8,
     paddingVertical: 8,
     paddingHorizontal: 10,
-  },
-  dateButtonActive: {
-    backgroundColor: theme.colors.primarySoft,
-    borderColor: theme.colors.primary,
   },
   dateLabel: {
     fontSize: 10,
     fontWeight: '700',
-    color: theme.colors.muted,
     marginBottom: 2,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -254,28 +313,26 @@ const styles = StyleSheet.create({
   dateValue: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#94a3b8',
-  },
-  dateValueActive: {
-    color: theme.colors.primaryDark,
   },
   dateSeparator: {
     fontSize: 14,
-    color: '#cbd5e1',
     fontWeight: '700',
   },
 
   // iOS Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#fff',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingBottom: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 10,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -283,16 +340,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
   },
   modalTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
   },
-  modalDone: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.colors.primary,
+  doneButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  doneButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

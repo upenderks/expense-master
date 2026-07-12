@@ -1,6 +1,13 @@
 ﻿import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, StyleProp, ViewStyle } from 'react-native';
-import { theme } from '../theme';
+import {
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+  StyleProp,
+  ViewStyle,
+} from 'react-native';
+import { useTheme } from '../context/ThemeContext';
 
 interface ButtonProps {
   title: string;
@@ -11,8 +18,28 @@ interface ButtonProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export function Button({ title, onPress, variant = 'primary', loading, disabled, style }: ButtonProps) {
+export function Button({
+  title,
+  onPress,
+  variant = 'primary',
+  loading,
+  disabled,
+  style,
+}: ButtonProps) {
+  const { theme } = useTheme();
   const isDisabled = disabled || loading;
+
+  const variantStyles: Record<string, ViewStyle> = {
+    primary: { backgroundColor: theme.colors.primary },
+    secondary: {
+      backgroundColor: theme.colors.primarySoft,
+      shadowOpacity: 0.04,
+      elevation: 1,
+    },
+    danger: { backgroundColor: theme.colors.danger },
+    success: { backgroundColor: theme.colors.success },
+  };
+
   return (
     <TouchableOpacity
       activeOpacity={0.78}
@@ -20,18 +47,25 @@ export function Button({ title, onPress, variant = 'primary', loading, disabled,
       disabled={isDisabled}
       style={[
         styles.button,
-        variant === 'primary' && styles.primary,
-        variant === 'secondary' && styles.secondary,
-        variant === 'danger' && styles.danger,
-        variant === 'success' && styles.success,
+        variantStyles[variant],
+        { shadowColor: theme.colors.shadow },
         isDisabled && styles.disabled,
         style,
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'secondary' ? theme.colors.primary : '#fff'} />
+        <ActivityIndicator
+          color={variant === 'secondary' ? theme.colors.primary : '#fff'}
+        />
       ) : (
-        <Text style={[styles.text, variant === 'secondary' && styles.secondaryText]}>{title}</Text>
+        <Text
+          style={[
+            styles.text,
+            variant === 'secondary' && { color: theme.colors.primaryDark },
+          ]}
+        >
+          {title}
+        </Text>
       )}
     </TouchableOpacity>
   );
@@ -42,20 +76,19 @@ const styles = StyleSheet.create({
     minHeight: 50,
     paddingVertical: 13,
     paddingHorizontal: 18,
-    borderRadius: theme.radius.md,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: theme.colors.shadow,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.14,
     shadowRadius: 8,
     elevation: 3,
   },
-  primary: { backgroundColor: theme.colors.primary },
-  secondary: { backgroundColor: theme.colors.primarySoft, shadowOpacity: 0.04, elevation: 1 },
-  danger: { backgroundColor: theme.colors.danger },
-  success: { backgroundColor: theme.colors.success },
   disabled: { opacity: 0.55 },
-  text: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 0.2 },
-  secondaryText: { color: theme.colors.primaryDark },
+  text: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
 });
