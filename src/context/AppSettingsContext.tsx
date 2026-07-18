@@ -18,6 +18,7 @@ import {
 export const FEATURE_KEYS = {
   MODULE_MONEY: 'module_money_enabled',
   MODULE_EXPENSE: 'module_expense_enabled',
+  MODULE_TRACKER: 'module_tracker_enabled',
   FEATURE_PDF_REPORT: 'feature_pdf_report',
   FEATURE_RECEIPT_PHOTO: 'feature_receipt_photo',
   FEATURE_SETTLEMENT: 'feature_settlement',
@@ -33,6 +34,7 @@ export type FeatureKey = (typeof FEATURE_KEYS)[keyof typeof FEATURE_KEYS];
 const DEFAULT_SETTINGS: Record<string, string> = {
   [FEATURE_KEYS.MODULE_MONEY]: 'true',
   [FEATURE_KEYS.MODULE_EXPENSE]: 'true',
+  [FEATURE_KEYS.MODULE_TRACKER]: 'true',
   [FEATURE_KEYS.FEATURE_PDF_REPORT]: 'true',
   [FEATURE_KEYS.FEATURE_RECEIPT_PHOTO]: 'true',
   [FEATURE_KEYS.FEATURE_SETTLEMENT]: 'true',

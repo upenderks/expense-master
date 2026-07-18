@@ -10,7 +10,9 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { useTheme } from '../../../src/context/ThemeContext';
+import { useLanguage } from '../../../src/context/LanguageContext';
 import { FEATURE_KEYS } from '../../../src/context/AppSettingsContext';
+import { Language } from '../../../src/i18n/translations';
 import {
   getAllUserSettings,
   setUserSetting,
@@ -30,21 +32,6 @@ interface FeatureToggle {
   description: string;
 }
 
-const MODULE_TOGGLES: FeatureToggle[] = [
-  { key: FEATURE_KEYS.MODULE_MONEY, label: 'Money Module', icon: '💰', description: 'Borrowers, transactions, settlements' },
-  { key: FEATURE_KEYS.MODULE_EXPENSE, label: 'Expense Module', icon: '💸', description: 'Expense tracking, categories' },
-];
-
-const FEATURE_TOGGLES: FeatureToggle[] = [
-  { key: FEATURE_KEYS.FEATURE_PDF_REPORT, label: 'PDF Reports', icon: '📄', description: 'Generate expense reports' },
-  { key: FEATURE_KEYS.FEATURE_RECEIPT_PHOTO, label: 'Receipt Photos', icon: '📷', description: 'Attach photos to expenses' },
-  { key: FEATURE_KEYS.FEATURE_SETTLEMENT, label: 'Settlements', icon: '🤝', description: 'Settle borrower accounts' },
-  { key: FEATURE_KEYS.FEATURE_BACKUP_RESTORE, label: 'Backup & Restore', icon: '💾', description: 'Database backup/restore' },
-  { key: FEATURE_KEYS.FEATURE_DARK_MODE, label: 'Dark Mode', icon: '🌙', description: 'Theme toggle option' },
-  { key: FEATURE_KEYS.FEATURE_CHARTS, label: 'Charts & Graphs', icon: '📊', description: 'Dashboard visualizations' },
-  { key: 'app_language', label: 'Language', icon: '🌐', description: 'Default: English' }
-];
-
 export default function UserSettings() {
   const { id, userName, userEmail, isActive, adminId } = useLocalSearchParams<{
     id: string;
@@ -54,6 +41,7 @@ export default function UserSettings() {
     adminId: string;
   }>();
   const { theme, isDark } = useTheme();
+  const { t } = useLanguage();
   const userId = Number(id);
 
   const [settings, setSettings] = useState<Record<string, string>>({});
@@ -62,6 +50,70 @@ export default function UserSettings() {
   const [newPassword, setNewPassword] = useState('');
   const [resettingPwd, setResettingPwd] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // ── Toggle arrays (inside component for t() access) ────────────────
+
+  const MODULE_TOGGLES: FeatureToggle[] = [
+    {
+      key: FEATURE_KEYS.MODULE_MONEY,
+      label: t('money_module'),
+      icon: '💰',
+      description: t('money_module_desc'),
+    },
+    {
+      key: FEATURE_KEYS.MODULE_EXPENSE,
+      label: t('expense_module'),
+      icon: '💸',
+      description: t('expense_module_desc'),
+    },
+    {
+      key: FEATURE_KEYS.MODULE_TRACKER,
+      label: t('tracker_module'),
+      icon: '⏱️',
+      description: t('tracker_module_desc'),
+    },
+  ];
+
+  const FEATURE_TOGGLES: FeatureToggle[] = [
+    {
+      key: FEATURE_KEYS.FEATURE_PDF_REPORT,
+      label: t('pdf_reports'),
+      icon: '📄',
+      description: t('pdf_reports_desc'),
+    },
+    {
+      key: FEATURE_KEYS.FEATURE_RECEIPT_PHOTO,
+      label: t('receipt_photos'),
+      icon: '📷',
+      description: t('receipt_photos_desc'),
+    },
+    {
+      key: FEATURE_KEYS.FEATURE_SETTLEMENT,
+      label: t('settlements_feature'),
+      icon: '🤝',
+      description: t('settlements_desc'),
+    },
+    {
+      key: FEATURE_KEYS.FEATURE_BACKUP_RESTORE,
+      label: t('backup_restore'),
+      icon: '💾',
+      description: t('backup_restore_desc'),
+    },
+    {
+      key: FEATURE_KEYS.FEATURE_DARK_MODE,
+      label: t('dark_mode_feature'),
+      icon: '🌙',
+      description: t('dark_mode_desc'),
+    },
+    {
+      key: FEATURE_KEYS.FEATURE_CHARTS,
+      label: t('charts_feature'),
+      icon: '📊',
+      description: t('charts_desc'),
+    },
+  ];
+
+  // ── Load data ──────────────────────────────────────────────────────
 
   const loadData = async () => {
     try {
@@ -76,11 +128,18 @@ export default function UserSettings() {
 
   useFocusEffect(useCallback(() => { loadData(); }, [userId]));
 
+  // ── Helpers ────────────────────────────────────────────────────────
+
   const isFeatureEnabled = (key: string): boolean => {
     const value = settings[key];
     if (value === undefined) return true;
     return value === 'true';
   };
+
+  const formatCurrency = (amount: number) =>
+    '₹' + Number(amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+
+  // ── Handlers ───────────────────────────────────────────────────────
 
   const handleToggle = async (key: string, value: boolean) => {
     setSaving(true);
@@ -88,47 +147,37 @@ export default function UserSettings() {
       await setUserSetting(userId, key, value ? 'true' : 'false');
       setSettings({ ...settings, [key]: value ? 'true' : 'false' });
     } catch (error) {
-      Alert.alert('Error', (error as Error).message);
+      Alert.alert(t('error'), (error as Error).message);
     } finally {
       setSaving(false);
     }
   };
 
-  const handleSetLanguage = async (lang: string) => {
-        setSaving(true);
-        try {
-            await setUserSetting(userId, 'app_language', lang);
-            setSettings({ ...settings, app_language: lang });
-        } catch (error) {
-            Alert.alert('Error', (error as Error).message);
-        } finally {
-            setSaving(false);
-        }
-    };
-
   const handleToggleActive = async (value: boolean) => {
     try {
-        console.log(`Toggling user status for ID: ${userId}, New Status: ${value}`);
       await updateUserStatus(userId, value);
-       setUserActive(value);
-      Alert.alert('✅ Updated', `User ${value ? 'activated' : 'deactivated'}`);
+      setUserActive(value);
+      Alert.alert(
+        `✅ ${t('updated')}`,
+        value ? t('user_activated') : t('user_deactivated')
+      );
     } catch (error) {
-      Alert.alert('Error', (error as Error).message);
+      Alert.alert(t('error'), (error as Error).message);
     }
   };
 
   const handleResetPassword = async () => {
     if (!newPassword || newPassword.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+      Alert.alert(t('error'), t('password_min_length'));
       return;
     }
     setResettingPwd(true);
     try {
       await resetUserPassword(userId, newPassword);
       setNewPassword('');
-      Alert.alert('✅ Success', 'Password has been reset');
+      Alert.alert(`✅ ${t('success')}`, t('password_reset_success'));
     } catch (error) {
-      Alert.alert('Error', (error as Error).message);
+      Alert.alert(t('error'), (error as Error).message);
     } finally {
       setResettingPwd(false);
     }
@@ -136,20 +185,20 @@ export default function UserSettings() {
 
   const handleDeleteUser = () => {
     Alert.alert(
-      '⚠️ Delete User',
-      `Permanently delete ${userName}? This will remove ALL their data including expenses, transactions, and settings.`,
+      `⚠️ ${t('delete_user')}`,
+      `${userName} - ${t('delete_user_confirm')}`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('delete'),
           style: 'destructive',
           onPress: async () => {
             try {
               await deleteUser(userId);
-              Alert.alert('✅ Deleted', 'User has been removed');
+              Alert.alert(`✅ ${t('success')}`, t('user_deleted'));
               router.back();
             } catch (error) {
-              Alert.alert('Error', (error as Error).message);
+              Alert.alert(t('error'), (error as Error).message);
             }
           },
         },
@@ -157,8 +206,19 @@ export default function UserSettings() {
     );
   };
 
-  const formatCurrency = (amount: number) =>
-    '₹' + Number(amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+  const handleSetLanguage = async (lang: string) => {
+    setSaving(true);
+    try {
+      await setUserSetting(userId, 'app_language', lang);
+      setSettings({ ...settings, app_language: lang });
+    } catch (error) {
+      Alert.alert(t('error'), (error as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ── Render toggle row ──────────────────────────────────────────────
 
   const renderToggle = (item: FeatureToggle) => (
     <View
@@ -186,30 +246,43 @@ export default function UserSettings() {
     </View>
   );
 
+  // ── Render ─────────────────────────────────────────────────────────
+
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+
       {/* Header */}
       <View style={[styles.header, { backgroundColor: theme.colors.primary }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backBtnText}>← Back</Text>
+          <Text style={styles.backBtnText}>← {t('back')}</Text>
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>User Settings</Text>
+          <Text style={styles.headerTitle}>{t('user_settings')}</Text>
           <Text style={styles.headerSubtitle}>{userName}</Text>
         </View>
         <View style={{ width: 60 }} />
       </View>
 
       <ScrollView style={styles.content}>
-        {/* User Profile */}
+
+        {/* User Profile Card */}
         <Card style={styles.profileCard}>
           <View style={styles.profileRow}>
-            <View style={[styles.avatar, { backgroundColor: userActive ? theme.colors.primary : theme.colors.muted }]}>
-              <Text style={styles.avatarText}>{userName?.charAt(0).toUpperCase()}</Text>
+            <View style={[
+              styles.avatar,
+              { backgroundColor: userActive ? theme.colors.primary : theme.colors.muted },
+            ]}>
+              <Text style={styles.avatarText}>
+                {userName?.charAt(0).toUpperCase()}
+              </Text>
             </View>
             <View style={styles.profileInfo}>
-              <Text style={[styles.profileName, { color: theme.colors.text }]}>{userName}</Text>
-              <Text style={[styles.profileEmail, { color: theme.colors.muted }]}>{userEmail}</Text>
+              <Text style={[styles.profileName, { color: theme.colors.text }]}>
+                {userName}
+              </Text>
+              <Text style={[styles.profileEmail, { color: theme.colors.muted }]}>
+                {userEmail}
+              </Text>
             </View>
           </View>
 
@@ -217,10 +290,10 @@ export default function UserSettings() {
           <View style={[styles.activeRow, { borderTopColor: theme.colors.border }]}>
             <View>
               <Text style={[styles.activeLabel, { color: theme.colors.text }]}>
-                Account Active
+                {t('account_active')}
               </Text>
               <Text style={[styles.activeDesc, { color: theme.colors.muted }]}>
-                {userActive ? 'User can login and use the app' : 'User cannot login'}
+                {userActive ? t('user_can_login') : t('user_cannot_login')}
               </Text>
             </View>
             <Switch
@@ -239,24 +312,28 @@ export default function UserSettings() {
         {userStats && (
           <Card style={styles.section}>
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-              📊 User Data
+              📊 {t('user_data')}
             </Text>
             <View style={styles.statsGrid}>
               {[
-                { label: 'Expenses', value: userStats.expenseCount, icon: '💸' },
-                { label: 'Total Spent', value: formatCurrency(userStats.totalExpenses), icon: '💰' },
-                { label: 'Borrowers', value: userStats.borrowerCount, icon: '👥' },
-                { label: 'Given', value: formatCurrency(userStats.totalGiven), icon: '↗️' },
-                { label: 'Received', value: formatCurrency(userStats.totalReceived), icon: '↙️' },
-                { label: 'Transactions', value: userStats.transactionCount, icon: '📝' },
+                { label: t('expenses'), value: userStats.expenseCount, icon: '💸' },
+                { label: t('total_expenses'), value: formatCurrency(userStats.totalExpenses), icon: '💰' },
+                { label: t('borrowers'), value: userStats.borrowerCount, icon: '👥' },
+                { label: t('total_given'), value: formatCurrency(userStats.totalGiven), icon: '↗️' },
+                { label: t('total_received'), value: formatCurrency(userStats.totalReceived), icon: '↙️' },
+                { label: t('transactions'), value: userStats.transactionCount, icon: '📝' },
               ].map((s, i) => (
                 <View
                   key={i}
                   style={[styles.statItem, { backgroundColor: isDark ? '#1e293b' : '#f9fafb' }]}
                 >
                   <Text style={styles.statIcon}>{s.icon}</Text>
-                  <Text style={[styles.statValue, { color: theme.colors.text }]}>{s.value}</Text>
-                  <Text style={[styles.statLabel, { color: theme.colors.muted }]}>{s.label}</Text>
+                  <Text style={[styles.statValue, { color: theme.colors.text }]}>
+                    {s.value}
+                  </Text>
+                  <Text style={[styles.statLabel, { color: theme.colors.muted }]}>
+                    {s.label}
+                  </Text>
                 </View>
               ))}
             </View>
@@ -266,7 +343,7 @@ export default function UserSettings() {
         {/* Module Controls */}
         <Card style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-            📦 Modules
+            📦 {t('modules')}
           </Text>
           {MODULE_TOGGLES.map(renderToggle)}
         </Card>
@@ -274,7 +351,7 @@ export default function UserSettings() {
         {/* Feature Controls */}
         <Card style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-            🎛️ Features
+            🎛️ {t('features')}
           </Text>
           {FEATURE_TOGGLES.map(renderToggle)}
         </Card>
@@ -282,9 +359,9 @@ export default function UserSettings() {
         {/* Language Control */}
         <Card style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-            🌐 Language
+            🌐 {t('language')}
           </Text>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
+          <View style={styles.languageRow}>
             {([
               { lang: 'en', label: 'English', icon: '🇬🇧' },
               { lang: 'hi', label: 'हिंदी', icon: '🇮🇳' },
@@ -294,32 +371,27 @@ export default function UserSettings() {
                 <TouchableOpacity
                   key={item.lang}
                   style={[
-                    styles.toggleRow,
+                    styles.languageOption,
                     {
-                      flex: 1,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      paddingVertical: 14,
-                      borderRadius: 10,
-                      borderBottomWidth: 0,
                       backgroundColor:
                         currentLang === item.lang
                           ? theme.colors.primary
-                          : isDark
-                          ? '#334155'
-                          : '#e5e7eb',
+                          : isDark ? '#334155' : '#e5e7eb',
+                      borderColor:
+                        currentLang === item.lang
+                          ? theme.colors.primary
+                          : theme.colors.border,
                     },
                   ]}
-                  onPress={() => handleToggle('app_language', false)}
+                  onPress={() => handleSetLanguage(item.lang)}
                 >
-                  <Text style={{ fontSize: 20, marginBottom: 4 }}>{item.icon}</Text>
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      fontWeight: '600',
+                  <Text style={styles.languageOptionIcon}>{item.icon}</Text>
+                  <Text style={[
+                    styles.languageOptionLabel,
+                    {
                       color: currentLang === item.lang ? '#fff' : theme.colors.text,
-                    }}
-                  >
+                    },
+                  ]}>
                     {item.label}
                   </Text>
                 </TouchableOpacity>
@@ -331,17 +403,17 @@ export default function UserSettings() {
         {/* Reset Password */}
         <Card style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-            🔑 Reset Password
+            🔑 {t('reset_password')}
           </Text>
           <Input
-            label="New Password"
+            label={t('new_password')}
             value={newPassword}
             onChangeText={setNewPassword}
-            placeholder="Min 6 characters"
+            placeholder={t('min_6_chars')}
             secureTextEntry
           />
           <Button
-            title="Reset Password"
+            title={`🔑 ${t('reset_password')}`}
             onPress={handleResetPassword}
             loading={resettingPwd}
           />
@@ -355,12 +427,12 @@ export default function UserSettings() {
             borderColor: isDark ? '#dc2626' : '#fecaca',
           },
         ]}>
-          <Text style={styles.dangerTitle}>⚠️ Danger Zone</Text>
+          <Text style={styles.dangerTitle}>⚠️ {t('danger_zone')}</Text>
           <Text style={[styles.dangerDesc, { color: theme.colors.muted }]}>
-            Permanently delete this user and all their data.
+            {t('delete_user_confirm')}
           </Text>
           <Button
-            title="🗑️ Delete User"
+            title={`🗑️ ${t('delete_user')}`}
             variant="danger"
             onPress={handleDeleteUser}
           />
@@ -374,23 +446,49 @@ export default function UserSettings() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { paddingTop: 50, paddingBottom: 16, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' },
+
+  // Header
+  header: {
+    paddingTop: 50,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   backBtn: { width: 60 },
   backBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   headerCenter: { flex: 1, alignItems: 'center' },
   headerTitle: { color: '#fff', fontSize: 18, fontWeight: '800' },
-  headerSubtitle: { color: 'rgba(255,255,255,0.8)', fontSize: 13, marginTop: 2 },
+  headerSubtitle: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 13,
+    marginTop: 2,
+  },
+
   content: { flex: 1, padding: 16 },
 
   // Profile
   profileCard: { marginBottom: 16 },
   profileRow: { flexDirection: 'row', alignItems: 'center' },
-  avatar: { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center' },
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   avatarText: { color: '#fff', fontSize: 24, fontWeight: 'bold' },
   profileInfo: { flex: 1, marginLeft: 14 },
   profileName: { fontSize: 20, fontWeight: '700' },
   profileEmail: { fontSize: 13, marginTop: 2 },
-  activeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, paddingTop: 14, borderTopWidth: 1 },
+  activeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 16,
+    paddingTop: 14,
+    borderTopWidth: 1,
+  },
   activeLabel: { fontSize: 15, fontWeight: '600' },
   activeDesc: { fontSize: 12, marginTop: 2 },
 
@@ -400,20 +498,47 @@ const styles = StyleSheet.create({
 
   // Stats
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  statItem: { width: '31%', alignItems: 'center', paddingVertical: 12, borderRadius: 10 },
+  statItem: {
+    width: '31%',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
   statIcon: { fontSize: 18, marginBottom: 4 },
   statValue: { fontSize: 14, fontWeight: '700' },
   statLabel: { fontSize: 10, marginTop: 2 },
 
   // Toggle rows
-  toggleRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1 },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+  },
   toggleIcon: { fontSize: 22, marginRight: 12 },
   toggleInfo: { flex: 1 },
   toggleLabel: { fontSize: 14, fontWeight: '600' },
   toggleDesc: { fontSize: 12, marginTop: 2 },
 
+  // Language
+  languageRow: { flexDirection: 'row', gap: 8 },
+  languageOption: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  languageOptionIcon: { fontSize: 22, marginBottom: 4 },
+  languageOptionLabel: { fontSize: 13, fontWeight: '700' },
+
   // Danger
   dangerCard: { marginBottom: 16, borderWidth: 1 },
-  dangerTitle: { fontSize: 15, fontWeight: '700', color: '#dc2626', marginBottom: 6 },
+  dangerTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#dc2626',
+    marginBottom: 6,
+  },
   dangerDesc: { fontSize: 13, marginBottom: 14 },
 });

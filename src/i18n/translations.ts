@@ -401,6 +401,8 @@ const en = {
     generate_pdf: '📄 PDF',
     generating_pdf_report: 'Generating...',
     time: 'Time',
+    tracker_module: 'Tracker Module',
+    tracker_module_desc: 'Asset time tracking, customers, payments',
   
 };
 
@@ -804,6 +806,8 @@ const hi: typeof en = {
     generate_pdf: '📄 पीडीएफ',
     generating_pdf_report: 'बना रहा है...',
     time: 'समय',
+    tracker_module: 'ट्रैकर मॉड्यूल',
+    tracker_module_desc: 'संपत्ति समय ट्रैकिंग, ग्राहक, भुगतान',
 };
 
 export const translations: Record<Language, typeof en> = {

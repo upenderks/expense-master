@@ -7,33 +7,29 @@ import { useLanguage } from '../../src/context/LanguageContext';
 export default function TabLayout() {
   const { theme } = useTheme();
 
-  // Safe settings access with defaults
   let moneyEnabled = true;
   let expenseEnabled = true;
+  let trackerEnabled = true;
   try {
     const { isEnabled } = useAppSettings();
     moneyEnabled = isEnabled(FEATURE_KEYS.MODULE_MONEY);
     expenseEnabled = isEnabled(FEATURE_KEYS.MODULE_EXPENSE);
-  } catch {
-    // Settings not loaded yet
-  }
+    trackerEnabled = isEnabled(FEATURE_KEYS.MODULE_TRACKER);
+  } catch {}
 
-  // Safe language access with defaults
   let tabDashboard = 'Dashboard';
   let tabMoney = 'Money';
   let tabExpenses = 'Expenses';
   let tabTracker = 'Tracker';
   let tabMore = 'More';
   try {
-    const { t, language } = useLanguage();
+    const { t } = useLanguage();
     tabDashboard = t('tab_dashboard');
     tabMoney = t('tab_money');
     tabExpenses = t('tab_expenses');
     tabTracker = t('tab_tracker');
     tabMore = t('tab_more');
-  } catch {
-    // Language not loaded yet
-  }
+  } catch {}
 
   return (
     <Tabs
@@ -79,6 +75,7 @@ export default function TabLayout() {
         options={{
           title: tabTracker,
           tabBarIcon: () => <Text style={{ fontSize: 22 }}>⏱️</Text>,
+          href: trackerEnabled ? '/(tabs)/tracker' : null,
         }}
       />
       <Tabs.Screen
