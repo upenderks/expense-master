@@ -308,6 +308,100 @@ const en = {
   clear_filter: 'Clear',
   format_date: 'Format: YYYY-MM-DD',
   select: 'Select',
+  // ── Asset Tracker ──────────────────────────────────────────────
+    tab_tracker: 'Tracker',
+    tracker_dashboard: 'Dashboard',
+    tracker_assets: 'Assets',
+    tracker_customers: 'Customers',
+    tracker_logs: 'Time Logs',
+
+    // Dashboard
+    active_assets: 'Active Assets',
+    total_revenue: 'Total Revenue',
+    recent_jobs: 'Recent Jobs',
+    no_jobs_yet: 'No jobs yet. Start a timer or add manually.',
+    top_customers: 'Top Customers',
+    billed: 'Billed',
+    due: 'due',
+
+    // Timer
+    live_timer: 'Live Timer',
+    select_asset: 'Select Asset',
+    select_customer: 'Select Customer',
+    start_timer: '▶ Start Timer',
+    stop_timer: '⏹ Stop Timer',
+    save_job_record: 'Save Job Record',
+    save_job: 'Save Job',
+    asset_label: 'Asset',
+    duration: 'Duration',
+    rate: 'Rate',
+    est_amount: 'Est.',
+
+    // Assets
+    add_asset: 'Add Asset',
+    edit_asset: 'Edit Asset',
+    delete_asset: 'Delete Asset',
+    delete_asset_confirm: 'All time logs will be deleted.',
+    asset_name: 'Asset Name',
+    asset_type: 'Asset Type',
+    hourly_rate: 'Hourly Rate (₹)',
+    hourly_rate_invalid: 'Please enter valid hourly rate',
+    asset_name_required: 'Asset name is required',
+    asset_inactive: 'Inactive',
+    asset_active_toggle: 'Active',
+    asset_active_desc: 'Inactive assets won\'t appear in timer',
+    no_assets_yet: 'No assets yet. Tap + to add one.',
+
+    // Asset types
+    type_vehicle: '🚛 Vehicle',
+    type_tractor: '🚜 Tractor',
+    type_machine: '⚙️ Machine',
+    type_equipment: '🔧 Equipment',
+    type_other: '📦 Other',
+
+    // Customers
+    add_customer: 'Add Customer',
+    edit_customer: 'Edit Customer',
+    delete_customer: 'Delete Customer',
+    delete_customer_confirm: 'All related logs will be deleted.',
+    customer_name_required: 'Customer name is required',
+    no_customers_yet: 'No customers yet. Tap + to add one.',
+    tap_for_report: 'Tap for full report →',
+    total_billed: 'Total Billed',
+    total_paid: 'Total Paid',
+
+    // Time logs
+    add_manual_log: '+ Add Manual Log',
+    edit_log: 'Edit Job Log',
+    add_log: 'Add Job Log',
+    delete_log: 'Delete Log',
+    no_logs_yet: 'No time logs yet.',
+    start_time: 'Start Time *',
+    end_time: 'End Time *',
+    end_after_start: 'End time must be after start time',
+    select_asset_customer: 'Please select asset and customer',
+    select_asset_customer_timer: 'Please select asset and customer first',
+    enter_start_end: 'Please enter start and end time',
+    job_description: 'Job description...',
+
+    // Customer report
+    customer_report: 'Customer Report',
+    job_history: 'Job History',
+    payment_history: 'Payment History',
+    record_payment: '+ Record Payment',
+    add_payment: 'Record Payment',
+    payment_amount: 'Amount (₹) *',
+    payment_date: 'Payment Date',
+    payment_notes: 'e.g., Cash payment',
+    payment_invalid: 'Please enter valid amount',
+    no_jobs_period: 'No jobs in this period',
+    no_payments_yet: 'No payments recorded yet',
+    total_hours: 'Total Hours',
+    total_jobs: 'Total Jobs',
+    generate_pdf: '📄 PDF',
+    generating_pdf_report: 'Generating...',
+    time: 'Time',
+  
 };
 
 const hi: typeof en = {
@@ -616,6 +710,100 @@ const hi: typeof en = {
   clear_filter: 'साफ करें',
   format_date: 'प्रारूप: YYYY-MM-DD',
   select: 'चुनें',
+
+  // ── Asset Tracker ──────────────────────────────────────────────
+    tab_tracker: 'ट्रैकर',
+    tracker_dashboard: 'डैशबोर्ड',
+    tracker_assets: 'संपत्ति',
+    tracker_customers: 'ग्राहक',
+    tracker_logs: 'समय लॉग',
+
+    // Dashboard
+    active_assets: 'सक्रिय संपत्ति',
+    total_revenue: 'कुल आय',
+    recent_jobs: 'हाल के काम',
+    no_jobs_yet: 'अभी तक कोई काम नहीं। टाइमर शुरू करें या मैन्युअल जोड़ें।',
+    top_customers: 'शीर्ष ग्राहक',
+    billed: 'बिल किया',
+    due: 'बकाया',
+
+    // Timer
+    live_timer: 'लाइव टाइमर',
+    select_asset: 'संपत्ति चुनें',
+    select_customer: 'ग्राहक चुनें',
+    start_timer: '▶ टाइमर शुरू करें',
+    stop_timer: '⏹ टाइमर रोकें',
+    save_job_record: 'काम रिकॉर्ड सेव करें',
+    save_job: 'काम सेव करें',
+    asset_label: 'संपत्ति',
+    duration: 'अवधि',
+    rate: 'दर',
+    est_amount: 'अनुमानित',
+
+    // Assets
+    add_asset: 'संपत्ति जोड़ें',
+    edit_asset: 'संपत्ति संपादित करें',
+    delete_asset: 'संपत्ति हटाएं',
+    delete_asset_confirm: 'सभी समय लॉग हटा दिए जाएंगे।',
+    asset_name: 'संपत्ति का नाम',
+    asset_type: 'संपत्ति का प्रकार',
+    hourly_rate: 'प्रति घंटा दर (₹)',
+    hourly_rate_invalid: 'कृपया वैध प्रति घंटा दर दर्ज करें',
+    asset_name_required: 'संपत्ति का नाम आवश्यक है',
+    asset_inactive: 'निष्क्रिय',
+    asset_active_toggle: 'सक्रिय',
+    asset_active_desc: 'निष्क्रिय संपत्ति टाइमर में नहीं दिखेगी',
+    no_assets_yet: 'अभी तक कोई संपत्ति नहीं। + दबाकर जोड़ें।',
+
+    // Asset types
+    type_vehicle: '🚛 वाहन',
+    type_tractor: '🚜 ट्रैक्टर',
+    type_machine: '⚙️ मशीन',
+    type_equipment: '🔧 उपकरण',
+    type_other: '📦 अन्य',
+
+    // Customers
+    add_customer: 'ग्राहक जोड़ें',
+    edit_customer: 'ग्राहक संपादित करें',
+    delete_customer: 'ग्राहक हटाएं',
+    delete_customer_confirm: 'सभी संबंधित लॉग हटा दिए जाएंगे।',
+    customer_name_required: 'ग्राहक का नाम आवश्यक है',
+    no_customers_yet: 'अभी तक कोई ग्राहक नहीं। + दबाकर जोड़ें।',
+    tap_for_report: 'पूरी रिपोर्ट के लिए टैप करें →',
+    total_billed: 'कुल बिल',
+    total_paid: 'कुल भुगतान',
+
+    // Time logs
+    add_manual_log: '+ मैन्युअल लॉग जोड़ें',
+    edit_log: 'काम लॉग संपादित करें',
+    add_log: 'काम लॉग जोड़ें',
+    delete_log: 'लॉग हटाएं',
+    no_logs_yet: 'अभी तक कोई समय लॉग नहीं।',
+    start_time: 'शुरू का समय *',
+    end_time: 'खत्म का समय *',
+    end_after_start: 'खत्म का समय शुरू के बाद होना चाहिए',
+    select_asset_customer: 'कृपया संपत्ति और ग्राहक चुनें',
+    select_asset_customer_timer: 'कृपया पहले संपत्ति और ग्राहक चुनें',
+    enter_start_end: 'कृपया शुरू और खत्म का समय दर्ज करें',
+    job_description: 'काम का विवरण...',
+
+    // Customer report
+    customer_report: 'ग्राहक रिपोर्ट',
+    job_history: 'काम इतिहास',
+    payment_history: 'भुगतान इतिहास',
+    record_payment: '+ भुगतान दर्ज करें',
+    add_payment: 'भुगतान दर्ज करें',
+    payment_amount: 'राशि (₹) *',
+    payment_date: 'भुगतान तारीख',
+    payment_notes: 'जैसे, नकद भुगतान',
+    payment_invalid: 'कृपया वैध राशि दर्ज करें',
+    no_jobs_period: 'इस अवधि में कोई काम नहीं',
+    no_payments_yet: 'अभी तक कोई भुगतान दर्ज नहीं',
+    total_hours: 'कुल घंटे',
+    total_jobs: 'कुल काम',
+    generate_pdf: '📄 पीडीएफ',
+    generating_pdf_report: 'बना रहा है...',
+    time: 'समय',
 };
 
 export const translations: Record<Language, typeof en> = {

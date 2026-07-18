@@ -19,6 +19,7 @@ export default function RootLayout() {
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="borrower/[id]" />
               <Stack.Screen name="admin" />
+              <Stack.Screen name="tracker/customer-report/[id]" />
             </Stack>
           </AuthProvider>
         </AppSettingsProvider>

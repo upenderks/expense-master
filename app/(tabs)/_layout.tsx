@@ -6,11 +6,34 @@ import { useLanguage } from '../../src/context/LanguageContext';
 
 export default function TabLayout() {
   const { theme } = useTheme();
-  const { isEnabled } = useAppSettings();
-  const { t } = useLanguage();
 
-  const moneyEnabled = isEnabled(FEATURE_KEYS.MODULE_MONEY);
-  const expenseEnabled = isEnabled(FEATURE_KEYS.MODULE_EXPENSE);
+  // Safe settings access with defaults
+  let moneyEnabled = true;
+  let expenseEnabled = true;
+  try {
+    const { isEnabled } = useAppSettings();
+    moneyEnabled = isEnabled(FEATURE_KEYS.MODULE_MONEY);
+    expenseEnabled = isEnabled(FEATURE_KEYS.MODULE_EXPENSE);
+  } catch {
+    // Settings not loaded yet
+  }
+
+  // Safe language access with defaults
+  let tabDashboard = 'Dashboard';
+  let tabMoney = 'Money';
+  let tabExpenses = 'Expenses';
+  let tabTracker = 'Tracker';
+  let tabMore = 'More';
+  try {
+    const { t, language } = useLanguage();
+    tabDashboard = t('tab_dashboard');
+    tabMoney = t('tab_money');
+    tabExpenses = t('tab_expenses');
+    tabTracker = t('tab_tracker');
+    tabMore = t('tab_more');
+  } catch {
+    // Language not loaded yet
+  }
 
   return (
     <Tabs
@@ -31,14 +54,14 @@ export default function TabLayout() {
       <Tabs.Screen
         name="dashboard"
         options={{
-          title: t('tab_dashboard'),
+          title: tabDashboard,
           tabBarIcon: () => <Text style={{ fontSize: 22 }}>📊</Text>,
         }}
       />
       <Tabs.Screen
         name="money"
         options={{
-          title: t('tab_money'),
+          title: tabMoney,
           tabBarIcon: () => <Text style={{ fontSize: 22 }}>💰</Text>,
           href: moneyEnabled ? '/(tabs)/money' : null,
         }}
@@ -46,15 +69,22 @@ export default function TabLayout() {
       <Tabs.Screen
         name="expenses"
         options={{
-          title: t('tab_expenses'),
+          title: tabExpenses,
           tabBarIcon: () => <Text style={{ fontSize: 22 }}>💸</Text>,
           href: expenseEnabled ? '/(tabs)/expenses' : null,
         }}
       />
       <Tabs.Screen
+        name="tracker"
+        options={{
+          title: tabTracker,
+          tabBarIcon: () => <Text style={{ fontSize: 22 }}>⏱️</Text>,
+        }}
+      />
+      <Tabs.Screen
         name="more"
         options={{
-          title: t('tab_more'),
+          title: tabMore,
           tabBarIcon: () => <Text style={{ fontSize: 22 }}>⚙️</Text>,
         }}
       />
