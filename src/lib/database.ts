@@ -175,6 +175,112 @@ async function initializeDatabase(database: SQLite.SQLiteDatabase): Promise<void
 
   // Asset tracking tables must run AFTER core tables
   await initAssetTrackingTables(database);
+
+  // Initialize organizer tables
+  await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS home_services (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      category TEXT DEFAULT 'other',
+      monthly_rate REAL DEFAULT 0,
+      per_visit_rate REAL DEFAULT 0,
+      working_days TEXT DEFAULT 'mon,tue,wed,thu,fri,sat',
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS service_absences (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      service_id INTEGER NOT NULL,
+      absent_date TEXT NOT NULL,
+      reason TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (service_id) REFERENCES home_services(id) ON DELETE CASCADE,
+      UNIQUE(service_id, absent_date)
+    );
+
+    CREATE TABLE IF NOT EXISTS refill_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      category TEXT DEFAULT 'other',
+      default_price REAL DEFAULT 0,
+      notes TEXT,
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS refill_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      item_id INTEGER NOT NULL,
+      refill_date TEXT NOT NULL,
+      amount REAL DEFAULT 0,
+      notes TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (item_id) REFERENCES refill_items(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS reminders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      category TEXT DEFAULT 'custom',
+      reminder_date TEXT NOT NULL,
+      reminder_time TEXT DEFAULT '09:00',
+      recurrence TEXT DEFAULT 'none',
+      recurrence_day INTEGER,
+      is_active INTEGER DEFAULT 1,
+      is_done INTEGER DEFAULT 0,
+      last_notified TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+  `);
+
+      // Habits tables
+  await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS habits (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      category TEXT DEFAULT 'custom',
+      mode TEXT DEFAULT 'fixed',
+      interval_hours REAL DEFAULT 2,
+      start_time TEXT DEFAULT '08:00',
+      end_time TEXT DEFAULT '20:00',
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS habit_times (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      habit_id INTEGER NOT NULL,
+      reminder_time TEXT NOT NULL,
+      FOREIGN KEY (habit_id) REFERENCES habits(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS habit_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      habit_id INTEGER NOT NULL,
+      log_date TEXT NOT NULL,
+      log_time TEXT NOT NULL,
+      is_done INTEGER DEFAULT 0,
+      done_at TEXT,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (habit_id) REFERENCES habits(id) ON DELETE CASCADE,
+      UNIQUE(habit_id, log_date, log_time)
+    );
+  `);
 }
 
 // ==================== ASSET TRACKING TABLES ====================

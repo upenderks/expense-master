@@ -20,6 +20,9 @@ export default function RootLayout() {
               <Stack.Screen name="borrower/[id]" />
               <Stack.Screen name="admin" />
               <Stack.Screen name="tracker/customer-report/[id]" />
+              <Stack.Screen name="organizer/service/[id]" />
+              <Stack.Screen name="organizer/refill/[id]" />
+              <Stack.Screen name="organizer/habit/[id]" />
             </Stack>
           </AuthProvider>
         </AppSettingsProvider>

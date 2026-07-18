@@ -10,17 +10,21 @@ export default function TabLayout() {
   let moneyEnabled = true;
   let expenseEnabled = true;
   let trackerEnabled = true;
+  let organizerEnabled = true;
+  
   try {
     const { isEnabled } = useAppSettings();
     moneyEnabled = isEnabled(FEATURE_KEYS.MODULE_MONEY);
     expenseEnabled = isEnabled(FEATURE_KEYS.MODULE_EXPENSE);
     trackerEnabled = isEnabled(FEATURE_KEYS.MODULE_TRACKER);
+    organizerEnabled = isEnabled(FEATURE_KEYS.MODULE_ORGANIZER);
   } catch {}
 
   let tabDashboard = 'Dashboard';
   let tabMoney = 'Money';
   let tabExpenses = 'Expenses';
   let tabTracker = 'Tracker';
+  let tabOrganizer = 'Organizer';
   let tabMore = 'More';
   try {
     const { t } = useLanguage();
@@ -28,6 +32,7 @@ export default function TabLayout() {
     tabMoney = t('tab_money');
     tabExpenses = t('tab_expenses');
     tabTracker = t('tab_tracker');
+    tabOrganizer = t('tab_organizer');
     tabMore = t('tab_more');
   } catch {}
 
@@ -76,6 +81,14 @@ export default function TabLayout() {
           title: tabTracker,
           tabBarIcon: () => <Text style={{ fontSize: 22 }}>⏱️</Text>,
           href: trackerEnabled ? '/(tabs)/tracker' : null,
+        }}
+      />
+      <Tabs.Screen
+        name="organizer"
+        options={{
+          title: tabOrganizer,
+          tabBarIcon: () => <Text style={{ fontSize: 22 }}>📒</Text>,
+          href: organizerEnabled ? '/(tabs)/organizer' : null,
         }}
       />
       <Tabs.Screen

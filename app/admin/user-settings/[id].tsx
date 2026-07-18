@@ -72,6 +72,12 @@ export default function UserSettings() {
       icon: '⏱️',
       description: t('tracker_module_desc'),
     },
+    {
+      key: FEATURE_KEYS.MODULE_ORGANIZER,
+      label: t('organizer_module'),
+      icon: '📒',
+      description: t('organizer_module_desc'),
+    },
   ];
 
   const FEATURE_TOGGLES: FeatureToggle[] = [
