@@ -30,6 +30,10 @@ import { Input } from '../../src/components/Input';
 import { Select } from '../../src/components/Select';
 import DatePicker from '../../src/components/DatePicker';
 import DateRangeFilter from '../../src/components/DateRangeFilter';
+import { EmptyState } from '../../src/components/EmptyState';
+import { ScreenHeader } from '../../src/components/ScreenHeader';
+import { StatPill } from '../../src/components/StatPill';
+import { formatCurrency, formatCompactCurrency } from '../../src/lib/formatters';
 
 type Tab = 'borrowers' | 'transactions';
 
@@ -146,12 +150,8 @@ export default function Money() {
       [
         { text: t('cancel'), style: 'cancel' },
         {
-          text: t('delete'),
-          style: 'destructive',
-          onPress: async () => {
-            await deleteBorrower(id, user!.id);
-            loadData();
-          },
+          text: t('delete'), style: 'destructive',
+          onPress: async () => { await deleteBorrower(id, user!.id); loadData(); },
         },
       ]
     );
@@ -161,10 +161,8 @@ export default function Money() {
     if (transaction) {
       setEditingTransaction(transaction);
       setTransactionForm({
-        borrowerId: transaction.borrower_id,
-        type: transaction.type,
-        amount: transaction.amount.toString(),
-        date: transaction.date,
+        borrowerId: transaction.borrower_id, type: transaction.type,
+        amount: transaction.amount.toString(), date: transaction.date,
         description: transaction.description || '',
       });
     } else {
@@ -187,10 +185,8 @@ export default function Money() {
       if (editingTransaction) {
         await updateTransaction(
           editingTransaction.id, user!.id,
-          Number(transactionForm.borrowerId),
-          transactionForm.type,
-          parseFloat(transactionForm.amount),
-          transactionForm.date,
+          Number(transactionForm.borrowerId), transactionForm.type,
+          parseFloat(transactionForm.amount), transactionForm.date,
           transactionForm.description
         );
       } else {
@@ -210,25 +206,24 @@ export default function Money() {
   };
 
   const handleDeleteTransaction = (id: number) => {
-    Alert.alert(
-      t('delete_transaction'),
-      t('are_you_sure'),
-      [
-        { text: t('cancel'), style: 'cancel' },
-        {
-          text: t('delete'),
-          style: 'destructive',
-          onPress: async () => {
-            await deleteTransaction(id, user!.id);
-            loadData();
-          },
-        },
-      ]
-    );
+    Alert.alert(t('delete_transaction'), t('are_you_sure'), [
+      { text: t('cancel'), style: 'cancel' },
+      {
+        text: t('delete'), style: 'destructive',
+        onPress: async () => { await deleteTransaction(id, user!.id); loadData(); },
+      },
+    ]);
   };
 
-  const formatCurrency = (amount: number) =>
-    '₹' + amount.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+  // const formatCurrency = (amount: number) =>
+  //   '₹' + amount.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+
+  // const formatShort = (amount: number) => {
+  //   if (amount >= 100000) return '₹' + (amount / 100000).toFixed(1) + 'L';
+  //   if (amount >= 1000) return '₹' + (amount / 1000).toFixed(1) + 'K';
+  //   console.log('Amount:', '₹' + amount.toFixed(2));
+  //   return '₹' + amount.toFixed(2);
+  // };
 
   const totalGiven = transactions
     .filter((tx) => tx.type === 'given')
@@ -238,22 +233,42 @@ export default function Money() {
     .filter((tx) => tx.type === 'received')
     .reduce((s, tx) => s + tx.amount, 0);
 
+  const outstanding = totalGiven - totalReceived;
+
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
 
-      {/* Tabs - Fixed: emoji and text separated to support Hindi */}
-      <View style={[
-        styles.tabs,
-        { backgroundColor: isDark ? '#334155' : '#e5e7eb' },
-      ]}>
-        {/* Borrowers Tab */}
+      {/* ── Screen Header ─────────────────────────────────────────── */}
+      <ScreenHeader
+        emoji="💰"
+        title={t('tab_money')}
+        subtitle={`${t('outstanding')}: ${formatCompactCurrency(Math.abs(outstanding))}`}
+      >
+        <View style={styles.headerStats}>
+          <StatPill
+            emoji="👥"
+            label={t('borrowers')}
+            value={String(borrowers.length)}
+          />
+          <StatPill
+            emoji="💸"
+            label={t('given')}
+            value={formatCompactCurrency(totalGiven)}
+          />
+          {/* <StatPill
+            emoji="💰"
+            label={t('received')}
+            value={formatShort(totalReceived)}
+          /> */}
+        </View>
+      </ScreenHeader>
+
+      {/* ── Tabs ──────────────────────────────────────────────────── */}
+      <View style={[styles.tabs, { backgroundColor: isDark ? '#334155' : '#e5e7eb' }]}>
         <TouchableOpacity
           style={[
             styles.tab,
-            activeTab === 'borrowers' && [
-              styles.activeTab,
-              { backgroundColor: theme.colors.surface },
-            ],
+            activeTab === 'borrowers' && [styles.activeTab, { backgroundColor: theme.colors.surface }],
           ]}
           onPress={() => setActiveTab('borrowers')}
         >
@@ -262,24 +277,17 @@ export default function Money() {
             <Text style={[
               styles.tabLabel,
               { color: theme.colors.muted },
-              activeTab === 'borrowers' && {
-                color: theme.colors.text,
-                fontWeight: '600',
-              },
+              activeTab === 'borrowers' && { color: theme.colors.text, fontWeight: '600' },
             ]}>
               {t('borrowers')}
             </Text>
           </View>
         </TouchableOpacity>
 
-        {/* Transactions Tab */}
         <TouchableOpacity
           style={[
             styles.tab,
-            activeTab === 'transactions' && [
-              styles.activeTab,
-              { backgroundColor: theme.colors.surface },
-            ],
+            activeTab === 'transactions' && [styles.activeTab, { backgroundColor: theme.colors.surface }],
           ]}
           onPress={() => setActiveTab('transactions')}
         >
@@ -288,10 +296,7 @@ export default function Money() {
             <Text style={[
               styles.tabLabel,
               { color: theme.colors.muted },
-              activeTab === 'transactions' && {
-                color: theme.colors.text,
-                fontWeight: '600',
-              },
+              activeTab === 'transactions' && { color: theme.colors.text, fontWeight: '600' },
             ]}>
               {t('transactions')}
             </Text>
@@ -312,9 +317,12 @@ export default function Money() {
           <>
             {borrowers.length === 0 ? (
               <Card>
-                <Text style={[styles.empty, { color: theme.colors.muted }]}>
-                  {t('no_borrowers_add')}
-                </Text>
+                <EmptyState
+                  emoji="👥"
+                  title={t('no_borrowers_add')}
+                  subtitle={t('app_tagline')}
+                  actionHint={`+ ${t('add_borrower')}`}
+                />
               </Card>
             ) : (
               borrowers.map((b) => (
@@ -325,13 +333,11 @@ export default function Money() {
                 >
                   <Card style={styles.itemCard}>
                     <View style={styles.borrowerHeader}>
-                      {/* Avatar */}
                       <View style={[styles.avatar, { backgroundColor: theme.colors.primary }]}>
                         <Text style={styles.avatarText}>
                           {b.name.charAt(0).toUpperCase()}
                         </Text>
                       </View>
-
                       <View style={{ flex: 1, marginLeft: 12 }}>
                         <Text style={[styles.borrowerName, { color: theme.colors.text }]}>
                           {b.name}
@@ -342,23 +348,15 @@ export default function Money() {
                           </Text>
                         )}
                       </View>
-
-                      {/* Chevron */}
                       <View style={[
                         styles.chevron,
                         { backgroundColor: isDark ? '#334155' : '#f3f4f6' },
                       ]}>
-                        <Text style={[styles.chevronText, { color: theme.colors.muted }]}>
-                          ›
-                        </Text>
+                        <Text style={[styles.chevronText, { color: theme.colors.muted }]}>›</Text>
                       </View>
                     </View>
 
-                    {/* Balance Row */}
-                    <View style={[
-                      styles.balanceRow,
-                      { borderTopColor: theme.colors.border },
-                    ]}>
+                    <View style={[styles.balanceRow, { borderTopColor: theme.colors.border }]}>
                       <Text style={[styles.balanceLabel, { color: theme.colors.muted }]}>
                         {t('balance')}:
                       </Text>
@@ -429,11 +427,13 @@ export default function Money() {
 
             {transactions.length === 0 ? (
               <Card>
-                <Text style={[styles.empty, { color: theme.colors.muted }]}>
-                  {startDate || endDate
+                <EmptyState
+                  emoji="💱"
+                  title={startDate || endDate
                     ? t('no_transactions_date')
                     : t('no_transactions_yet')}
-                </Text>
+                  actionHint={`+ ${t('add_transaction')}`}
+                />
               </Card>
             ) : (
               transactions.map((tx) => (
@@ -508,48 +508,14 @@ export default function Money() {
               <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
                 {editingBorrower ? t('edit_borrower') : t('add_borrower')}
               </Text>
-              <Input
-                label={`${t('name')} *`}
-                value={borrowerForm.name}
-                onChangeText={(v) => setBorrowerForm({ ...borrowerForm, name: v })}
-                placeholder={t('name')}
-              />
-              <Input
-                label={t('phone')}
-                value={borrowerForm.phone}
-                onChangeText={(v) => setBorrowerForm({ ...borrowerForm, phone: v })}
-                placeholder={t('phone')}
-                keyboardType="phone-pad"
-              />
-              <Input
-                label={t('email')}
-                value={borrowerForm.email}
-                onChangeText={(v) => setBorrowerForm({ ...borrowerForm, email: v })}
-                placeholder={t('email')}
-              />
-              <Input
-                label={t('address')}
-                value={borrowerForm.address}
-                onChangeText={(v) => setBorrowerForm({ ...borrowerForm, address: v })}
-                placeholder={t('address')}
-              />
-              <Input
-                label={t('notes')}
-                value={borrowerForm.notes}
-                onChangeText={(v) => setBorrowerForm({ ...borrowerForm, notes: v })}
-                placeholder={t('notes')}
-              />
+              <Input label={`${t('name')} *`} value={borrowerForm.name} onChangeText={(v) => setBorrowerForm({ ...borrowerForm, name: v })} placeholder={t('name')} />
+              <Input label={t('phone')} value={borrowerForm.phone} onChangeText={(v) => setBorrowerForm({ ...borrowerForm, phone: v })} placeholder={t('phone')} keyboardType="phone-pad" />
+              <Input label={t('email')} value={borrowerForm.email} onChangeText={(v) => setBorrowerForm({ ...borrowerForm, email: v })} placeholder={t('email')} />
+              <Input label={t('address')} value={borrowerForm.address} onChangeText={(v) => setBorrowerForm({ ...borrowerForm, address: v })} placeholder={t('address')} />
+              <Input label={t('notes')} value={borrowerForm.notes} onChangeText={(v) => setBorrowerForm({ ...borrowerForm, notes: v })} placeholder={t('notes')} />
               <View style={styles.modalButtons}>
-                <Button
-                  title={t('cancel')}
-                  variant="secondary"
-                  onPress={() => setBorrowerModal(false)}
-                />
-                <Button
-                  title={t('save')}
-                  onPress={handleSaveBorrower}
-                  loading={saving}
-                />
+                <Button title={t('cancel')} variant="secondary" onPress={() => setBorrowerModal(false)} />
+                <Button title={t('save')} onPress={handleSaveBorrower} loading={saving} />
               </View>
             </View>
           </ScrollView>
@@ -571,7 +537,6 @@ export default function Money() {
               options={borrowers.map((b) => ({ value: b.id, label: b.name }))}
             />
 
-            {/* Type Toggle - emoji and text separated for Hindi support */}
             <View style={styles.typeToggle}>
               <TouchableOpacity
                 style={[
@@ -579,9 +544,7 @@ export default function Money() {
                   { backgroundColor: isDark ? '#334155' : '#e5e7eb' },
                   transactionForm.type === 'given' && styles.typeActive,
                 ]}
-                onPress={() =>
-                  setTransactionForm({ ...transactionForm, type: 'given' })
-                }
+                onPress={() => setTransactionForm({ ...transactionForm, type: 'given' })}
               >
                 <View style={styles.typeContent}>
                   <Text style={styles.typeEmoji}>💸</Text>
@@ -600,9 +563,7 @@ export default function Money() {
                   { backgroundColor: isDark ? '#334155' : '#e5e7eb' },
                   transactionForm.type === 'received' && styles.typeActive,
                 ]}
-                onPress={() =>
-                  setTransactionForm({ ...transactionForm, type: 'received' })
-                }
+                onPress={() => setTransactionForm({ ...transactionForm, type: 'received' })}
               >
                 <View style={styles.typeContent}>
                   <Text style={styles.typeEmoji}>💰</Text>
@@ -620,38 +581,24 @@ export default function Money() {
             <Input
               label={t('amount')}
               value={transactionForm.amount}
-              onChangeText={(v) =>
-                setTransactionForm({ ...transactionForm, amount: v })
-              }
+              onChangeText={(v) => setTransactionForm({ ...transactionForm, amount: v })}
               placeholder="0"
               keyboardType="numeric"
             />
             <DatePicker
               label={t('date')}
               value={transactionForm.date}
-              onChange={(d) =>
-                setTransactionForm({ ...transactionForm, date: d })
-              }
+              onChange={(d) => setTransactionForm({ ...transactionForm, date: d })}
             />
             <Input
               label={t('description')}
               value={transactionForm.description}
-              onChangeText={(v) =>
-                setTransactionForm({ ...transactionForm, description: v })
-              }
+              onChangeText={(v) => setTransactionForm({ ...transactionForm, description: v })}
               placeholder={t('optional_description')}
             />
             <View style={styles.modalButtons}>
-              <Button
-                title={t('cancel')}
-                variant="secondary"
-                onPress={() => setTransactionModal(false)}
-              />
-              <Button
-                title={t('save')}
-                onPress={handleSaveTransaction}
-                loading={saving}
-              />
+              <Button title={t('cancel')} variant="secondary" onPress={() => setTransactionModal(false)} />
+              <Button title={t('save')} onPress={handleSaveTransaction} loading={saving} />
             </View>
           </View>
         </View>
@@ -663,8 +610,22 @@ export default function Money() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
 
-  // Tabs
-  tabs: { flexDirection: 'row', margin: 16, borderRadius: 8, padding: 4 },
+  // Header stats
+  headerStats: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+
+  // Tabs - below header
+  tabs: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+    borderRadius: 8,
+    padding: 4,
+  },
   tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 6 },
   activeTab: {
     shadowColor: '#000',
@@ -672,11 +633,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     elevation: 1,
   },
-  tabContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
+  tabContent: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   tabEmoji: { fontSize: 14 },
   tabLabel: { fontSize: 14 },
 
@@ -685,23 +642,11 @@ const styles = StyleSheet.create({
 
   // Borrower
   borrowerHeader: { flexDirection: 'row', alignItems: 'center' },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  avatar: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center' },
   avatarText: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
   borrowerName: { fontSize: 16, fontWeight: '600' },
   borrowerMeta: { fontSize: 13, marginTop: 2 },
-  chevron: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  chevron: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
   chevronText: { fontSize: 20, fontWeight: '300' },
   balanceRow: {
     flexDirection: 'row',
@@ -721,29 +666,15 @@ const styles = StyleSheet.create({
   addBtn: { marginHorizontal: 16, marginTop: 8 },
 
   // Summary
-  summaryRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    gap: 12,
-    marginBottom: 12,
-  },
+  summaryRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 12, marginBottom: 12 },
   summaryCard: { flex: 1, alignItems: 'center', padding: 12 },
   summaryLabel: { fontSize: 12 },
   summaryValue: { fontSize: 18, fontWeight: 'bold', marginTop: 4 },
 
   // Transaction
-  transactionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
+  transactionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   transactionName: { fontSize: 15, fontWeight: '600' },
-  transactionTypeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
-  },
+  transactionTypeRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   transactionTypeEmoji: { fontSize: 13 },
   transactionType: { fontSize: 13 },
   transactionDate: { fontSize: 12, marginTop: 2 },
@@ -757,30 +688,16 @@ const styles = StyleSheet.create({
 
   // Modal
   modalOverlay: { flex: 1, justifyContent: 'flex-end' },
-  modalContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '90%',
-  },
+  modalContent: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '90%' },
   modalInner: { paddingBottom: 40 },
   modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 16 },
   modalButtons: { flexDirection: 'row', gap: 12, marginTop: 16 },
 
   // Type toggle
   typeToggle: { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  typeButton: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderRadius: 8,
-  },
+  typeButton: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 8 },
   typeActive: { backgroundColor: '#3b82f6' },
-  typeContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
+  typeContent: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   typeEmoji: { fontSize: 16 },
   typeText: { fontSize: 14, fontWeight: '500' },
   typeTextActive: { color: '#fff' },

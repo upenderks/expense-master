@@ -36,6 +36,9 @@ import { PhotoPicker } from '../../src/components/PhotoPicker';
 import { PhotoViewer } from '../../src/components/PhotoViewer';
 import DatePicker from '../../src/components/DatePicker';
 import DateRangeFilter from '../../src/components/DateRangeFilter';
+import { EmptyState } from '../../src/components/EmptyState';
+import { ScreenHeader } from '../../src/components/ScreenHeader';
+import { StatPill } from '../../src/components/StatPill';
 
 type Tab = 'expenses' | 'categories';
 
@@ -199,10 +202,7 @@ export default function Expenses() {
     setSaving(true);
     try {
       if (editingExpense) {
-        if (
-          editingExpense.photo_uri &&
-          editingExpense.photo_uri !== expenseForm.photoUri
-        ) {
+        if (editingExpense.photo_uri && editingExpense.photo_uri !== expenseForm.photoUri) {
           await deletePhoto(editingExpense.photo_uri);
         }
         await updateExpense(
@@ -247,10 +247,7 @@ export default function Expenses() {
   const openCategoryModal = (category?: any) => {
     if (category) {
       setEditingCategory(category);
-      setCategoryForm({
-        name: category.name,
-        color: category.color || COLORS[0],
-      });
+      setCategoryForm({ name: category.name, color: category.color || COLORS[0] });
     } else {
       setEditingCategory(null);
       setCategoryForm({ name: '', color: COLORS[0] });
@@ -266,14 +263,9 @@ export default function Expenses() {
     setSaving(true);
     try {
       if (editingCategory) {
-        await updateExpenseCategory(
-          editingCategory.id, user!.id,
-          categoryForm.name.trim(), categoryForm.color
-        );
+        await updateExpenseCategory(editingCategory.id, user!.id, categoryForm.name.trim(), categoryForm.color);
       } else {
-        await createExpenseCategory(
-          user!.id, categoryForm.name.trim(), categoryForm.color
-        );
+        await createExpenseCategory(user!.id, categoryForm.name.trim(), categoryForm.color);
       }
       setCategoryModal(false);
       await loadData();
@@ -285,21 +277,17 @@ export default function Expenses() {
   };
 
   const handleDeleteCategory = (id: number, name: string) => {
-    Alert.alert(
-      t('delete_category'),
-      `"${name}" - ${t('delete_category_confirm')}`,
-      [
-        { text: t('cancel'), style: 'cancel' },
-        {
-          text: t('delete'),
-          style: 'destructive',
-          onPress: async () => {
-            await deleteExpenseCategory(id, user!.id);
-            await loadData();
-          },
+    Alert.alert(t('delete_category'), `"${name}" - ${t('delete_category_confirm')}`, [
+      { text: t('cancel'), style: 'cancel' },
+      {
+        text: t('delete'),
+        style: 'destructive',
+        onPress: async () => {
+          await deleteExpenseCategory(id, user!.id);
+          await loadData();
         },
-      ]
-    );
+      },
+    ]);
   };
 
   // ── Report ──────────────────────────────────────────────────────────────
@@ -308,10 +296,7 @@ export default function Expenses() {
     if (!user) return;
     setGeneratingReport(true);
     try {
-      const categoryMap: Record<
-        number,
-        { id: number; name: string; color: string; total: number }
-      > = {};
+      const categoryMap: Record<number, { id: number; name: string; color: string; total: number }> = {};
       filteredExpenses.forEach((e) => {
         if (!categoryMap[e.category_id]) {
           categoryMap[e.category_id] = {
@@ -345,10 +330,15 @@ export default function Expenses() {
   const formatCurrency = (amount: number) =>
     '₹' + Number(amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
 
+  const formatShort = (amount: number) => {
+    if (amount >= 100000) return '₹' + (amount / 100000).toFixed(1) + 'L';
+    if (amount >= 1000) return '₹' + (amount / 1000).toFixed(1) + 'K';
+    return '₹' + amount.toFixed(0);
+  };
+
   const filteredExpenses = expenses.filter((expense) => {
     const matchesDate = isDateInRange(expense.date, startDate, endDate);
-    const matchesCategory =
-      !filterCategory || expense.category_id === Number(filterCategory);
+    const matchesCategory = !filterCategory || expense.category_id === Number(filterCategory);
     return matchesDate && matchesCategory;
   });
 
@@ -361,19 +351,39 @@ export default function Expenses() {
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
 
-      {/* Tabs */}
-      <View style={[
-        styles.tabs,
-        { backgroundColor: isDark ? '#334155' : '#e5e7eb' },
-      ]}>
-        {/* Expenses Tab */}
+      {/* ── Screen Header ─────────────────────────────────────────── */}
+      <ScreenHeader
+        emoji="💸"
+        title={t('expenses')}
+        subtitle={`${t('total')}: ${formatCurrency(totalExpenses)}`}
+      >
+        <View style={styles.headerStats}>
+          <StatPill
+            emoji="📋"
+            label={t('transactions')}
+            value={String(filteredExpenses.length)}
+          />
+          <StatPill
+            emoji="🏷️"
+            label={t('categories')}
+            value={String(categories.length)}
+          />
+          {/* {(startDate || endDate || filterCategory !== '') && (
+            <StatPill
+              emoji="🔍"
+              label={t('filter')}
+              value="Active"
+            />
+          )} */}
+        </View>
+      </ScreenHeader>
+
+      {/* ── Tabs ──────────────────────────────────────────────────── */}
+      <View style={[styles.tabs, { backgroundColor: isDark ? '#334155' : '#e5e7eb' }]}>
         <TouchableOpacity
           style={[
             styles.tab,
-            activeTab === 'expenses' && [
-              styles.activeTab,
-              { backgroundColor: theme.colors.surface },
-            ],
+            activeTab === 'expenses' && [styles.activeTab, { backgroundColor: theme.colors.surface }],
           ]}
           onPress={() => setActiveTab('expenses')}
         >
@@ -382,24 +392,17 @@ export default function Expenses() {
             <Text style={[
               styles.tabLabel,
               { color: theme.colors.muted },
-              activeTab === 'expenses' && {
-                color: theme.colors.text,
-                fontWeight: '600',
-              },
+              activeTab === 'expenses' && { color: theme.colors.text, fontWeight: '600' },
             ]}>
               {t('expenses')}
             </Text>
           </View>
         </TouchableOpacity>
 
-        {/* Categories Tab */}
         <TouchableOpacity
           style={[
             styles.tab,
-            activeTab === 'categories' && [
-              styles.activeTab,
-              { backgroundColor: theme.colors.surface },
-            ],
+            activeTab === 'categories' && [styles.activeTab, { backgroundColor: theme.colors.surface }],
           ]}
           onPress={() => setActiveTab('categories')}
         >
@@ -408,10 +411,7 @@ export default function Expenses() {
             <Text style={[
               styles.tabLabel,
               { color: theme.colors.muted },
-              activeTab === 'categories' && {
-                color: theme.colors.text,
-                fontWeight: '600',
-              },
+              activeTab === 'categories' && { color: theme.colors.text, fontWeight: '600' },
             ]}>
               {t('categories')}
             </Text>
@@ -448,11 +448,7 @@ export default function Expenses() {
                 onChange={setFilterCategory}
                 options={[
                   { value: '', label: t('all_categories') },
-                  ...categories.map((c) => ({
-                    value: c.id,
-                    label: c.name,
-                    color: c.color,
-                  })),
+                  ...categories.map((c) => ({ value: c.id, label: c.name, color: c.color })),
                 ]}
                 placeholder={t('all_categories')}
               />
@@ -472,7 +468,6 @@ export default function Expenses() {
                 {formatCurrency(totalExpenses)}
               </Text>
 
-              {/* PDF Report Button */}
               {pdfReportEnabled && (
                 <TouchableOpacity
                   style={[
@@ -486,16 +481,12 @@ export default function Expenses() {
                   {generatingReport ? (
                     <View style={styles.reportButtonContent}>
                       <ActivityIndicator size="small" color="#fff" />
-                      <Text style={styles.reportButtonText}>
-                        {t('generating_pdf')}
-                      </Text>
+                      <Text style={styles.reportButtonText}>{t('generating_pdf')}</Text>
                     </View>
                   ) : (
                     <View style={styles.reportButtonContent}>
                       <Text style={styles.reportButtonIcon}>📄</Text>
-                      <Text style={styles.reportButtonText}>
-                        {t('generate_pdf_report')}
-                      </Text>
+                      <Text style={styles.reportButtonText}>{t('generate_pdf_report')}</Text>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -505,28 +496,24 @@ export default function Expenses() {
             {/* Expense list */}
             {filteredExpenses.length === 0 ? (
               <Card>
-                <Text style={[styles.empty, { color: theme.colors.muted }]}>
-                  {t('no_expenses_found')}
-                </Text>
+                <EmptyState
+                  emoji="💸"
+                  title={t('no_expenses_found')}
+                  subtitle={t('app_tagline')}
+                  actionHint={`+ ${t('add_expense')}`}
+                />
               </Card>
             ) : (
               filteredExpenses.map((e) => (
                 <Card key={e.id} style={styles.itemCard}>
                   <View style={styles.expenseRow}>
-                    {/* Thumbnail - only show if photos enabled */}
                     {receiptPhotoEnabled && e.photo_uri ? (
                       <TouchableOpacity
                         onPress={() => handleViewExpensePhoto(e.photo_uri)}
                         activeOpacity={0.8}
                       >
-                        <Image
-                          source={{ uri: e.photo_uri }}
-                          style={styles.thumbnail}
-                        />
-                        <View style={[
-                          styles.thumbnailBadge,
-                          { backgroundColor: theme.colors.surface },
-                        ]}>
+                        <Image source={{ uri: e.photo_uri }} style={styles.thumbnail} />
+                        <View style={[styles.thumbnailBadge, { backgroundColor: theme.colors.surface }]}>
                           <Text style={styles.thumbnailBadgeText}>📷</Text>
                         </View>
                       </TouchableOpacity>
@@ -558,16 +545,11 @@ export default function Expenses() {
                       <View style={styles.actionButtons}>
                         <TouchableOpacity
                           onPress={() => openExpenseModal(e)}
-                          style={[
-                            styles.editBtn,
-                            { backgroundColor: isDark ? '#1e3a5f' : '#dbeafe' },
-                          ]}
+                          style={[styles.editBtn, { backgroundColor: isDark ? '#1e3a5f' : '#dbeafe' }]}
                         >
                           <Text style={styles.editBtnText}>✏️</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity
-                          onPress={() => handleDeleteExpense(e.id, e.photo_uri)}
-                        >
+                        <TouchableOpacity onPress={() => handleDeleteExpense(e.id, e.photo_uri)}>
                           <Text style={styles.deleteBtn}>🗑️</Text>
                         </TouchableOpacity>
                       </View>
@@ -585,37 +567,28 @@ export default function Expenses() {
           </>
         ) : (
           <>
-            {/* Categories tab */}
             {categories.length === 0 ? (
               <Card>
-                <Text style={[styles.empty, { color: theme.colors.muted }]}>
-                  {t('no_categories_yet')}
-                </Text>
+                <EmptyState
+                  emoji="🏷️"
+                  title={t('no_categories_yet')}
+                  actionHint={`+ ${t('add_category')}`}
+                />
               </Card>
             ) : (
               categories.map((c) => (
                 <Card key={c.id} style={styles.itemCard}>
                   <View style={styles.categoryRow}>
-                    <View style={[
-                      styles.largeColorDot,
-                      { backgroundColor: c.color || '#6b7280' },
-                    ]} />
-                    <Text style={[styles.categoryName, { color: theme.colors.text }]}>
-                      {c.name}
-                    </Text>
+                    <View style={[styles.largeColorDot, { backgroundColor: c.color || '#6b7280' }]} />
+                    <Text style={[styles.categoryName, { color: theme.colors.text }]}>{c.name}</Text>
                     <View style={styles.actionButtons}>
                       <TouchableOpacity
                         onPress={() => openCategoryModal(c)}
-                        style={[
-                          styles.editBtn,
-                          { backgroundColor: isDark ? '#1e3a5f' : '#dbeafe' },
-                        ]}
+                        style={[styles.editBtn, { backgroundColor: isDark ? '#1e3a5f' : '#dbeafe' }]}
                       >
                         <Text style={styles.editBtnText}>✏️</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => handleDeleteCategory(c.id, c.name)}
-                      >
+                      <TouchableOpacity onPress={() => handleDeleteCategory(c.id, c.name)}>
                         <Text style={styles.deleteBtn}>🗑️</Text>
                       </TouchableOpacity>
                     </View>
@@ -638,10 +611,7 @@ export default function Expenses() {
       <Modal visible={expenseModal} animationType="slide" transparent>
         <View style={[styles.modalOverlay, { backgroundColor: theme.colors.overlay }]}>
           <ScrollView
-            style={[
-              styles.modalScrollContent,
-              { backgroundColor: theme.colors.modalBg },
-            ]}
+            style={[styles.modalScrollContent, { backgroundColor: theme.colors.modalBg }]}
             bounces={false}
           >
             <View style={styles.modalInner}>
@@ -652,22 +622,14 @@ export default function Expenses() {
               <Select
                 label={`${t('category')} *`}
                 value={expenseForm.categoryId}
-                onChange={(v) =>
-                  setExpenseForm({ ...expenseForm, categoryId: v })
-                }
-                options={categories.map((c) => ({
-                  value: c.id,
-                  label: c.name,
-                  color: c.color,
-                }))}
+                onChange={(v) => setExpenseForm({ ...expenseForm, categoryId: v })}
+                options={categories.map((c) => ({ value: c.id, label: c.name, color: c.color }))}
               />
 
               <Input
                 label={t('amount')}
                 value={expenseForm.amount}
-                onChangeText={(v) =>
-                  setExpenseForm({ ...expenseForm, amount: v })
-                }
+                onChangeText={(v) => setExpenseForm({ ...expenseForm, amount: v })}
                 placeholder="0"
                 keyboardType="numeric"
               />
@@ -675,21 +637,16 @@ export default function Expenses() {
               <DatePicker
                 label={t('date')}
                 value={expenseForm.date}
-                onChange={(d) =>
-                  setExpenseForm({ ...expenseForm, date: d })
-                }
+                onChange={(d) => setExpenseForm({ ...expenseForm, date: d })}
               />
 
               <Input
                 label={t('description')}
                 value={expenseForm.description}
-                onChangeText={(v) =>
-                  setExpenseForm({ ...expenseForm, description: v })
-                }
+                onChangeText={(v) => setExpenseForm({ ...expenseForm, description: v })}
                 placeholder={t('optional')}
               />
 
-              {/* Receipt Photo Picker - only if enabled */}
               {receiptPhotoEnabled && (
                 <PhotoPicker
                   label={t('receipt_photo')}
@@ -702,16 +659,8 @@ export default function Expenses() {
               )}
 
               <View style={styles.modalButtons}>
-                <Button
-                  title={t('cancel')}
-                  variant="secondary"
-                  onPress={() => setExpenseModal(false)}
-                />
-                <Button
-                  title={t('save')}
-                  onPress={handleSaveExpense}
-                  loading={saving}
-                />
+                <Button title={t('cancel')} variant="secondary" onPress={() => setExpenseModal(false)} />
+                <Button title={t('save')} onPress={handleSaveExpense} loading={saving} />
               </View>
             </View>
           </ScrollView>
@@ -721,10 +670,7 @@ export default function Expenses() {
       {/* ── Category Modal ─────────────────────────────────────────────── */}
       <Modal visible={categoryModal} animationType="slide" transparent>
         <View style={[styles.modalOverlay, { backgroundColor: theme.colors.overlay }]}>
-          <View style={[
-            styles.modalContent,
-            { backgroundColor: theme.colors.modalBg },
-          ]}>
+          <View style={[styles.modalContent, { backgroundColor: theme.colors.modalBg }]}>
             <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
               {editingCategory ? t('edit_category') : t('add_category')}
             </Text>
@@ -732,9 +678,7 @@ export default function Expenses() {
             <Input
               label={`${t('name')} *`}
               value={categoryForm.name}
-              onChangeText={(v) =>
-                setCategoryForm({ ...categoryForm, name: v })
-              }
+              onChangeText={(v) => setCategoryForm({ ...categoryForm, name: v })}
               placeholder={t('category_name')}
             />
 
@@ -753,24 +697,14 @@ export default function Expenses() {
                       { borderColor: isDark ? '#fff' : '#111827' },
                     ],
                   ]}
-                  onPress={() =>
-                    setCategoryForm({ ...categoryForm, color: c })
-                  }
+                  onPress={() => setCategoryForm({ ...categoryForm, color: c })}
                 />
               ))}
             </View>
 
             <View style={styles.modalButtons}>
-              <Button
-                title={t('cancel')}
-                variant="secondary"
-                onPress={() => setCategoryModal(false)}
-              />
-              <Button
-                title={t('save')}
-                onPress={handleSaveCategory}
-                loading={saving}
-              />
+              <Button title={t('cancel')} variant="secondary" onPress={() => setCategoryModal(false)} />
+              <Button title={t('save')} onPress={handleSaveCategory} loading={saving} />
             </View>
           </View>
         </View>
@@ -789,103 +723,60 @@ export default function Expenses() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
 
-  // Tabs
+  // Header stats
+  headerStats: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+
+  // Tabs - now below header, no top margin
   tabs: {
     flexDirection: 'row',
-    margin: 16,
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
     borderRadius: 8,
     padding: 4,
   },
-  tab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 6,
-  },
+  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 6 },
   activeTab: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     elevation: 1,
   },
-  tabContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  tabEmoji: {
-    fontSize: 14,
-  },
-  tabLabel: {
-    fontSize: 14,
-  },
+  tabContent: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  tabEmoji: { fontSize: 14 },
+  tabLabel: { fontSize: 14 },
 
   empty: { textAlign: 'center', padding: 20 },
   itemCard: { marginHorizontal: 16, marginBottom: 12 },
 
   // Total card
-  totalCard: {
-    marginHorizontal: 16,
-    marginBottom: 12,
-    alignItems: 'center',
-  },
+  totalCard: { marginHorizontal: 16, marginBottom: 12, alignItems: 'center' },
   totalLabel: { fontSize: 12 },
   totalValue: { fontSize: 28, fontWeight: 'bold', marginTop: 4 },
 
   // Report button
-  reportButton: {
-    marginTop: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    alignSelf: 'stretch',
-  },
-  reportButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
+  reportButton: { marginTop: 14, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 10, alignSelf: 'stretch' },
+  reportButtonContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   reportButtonIcon: { fontSize: 16 },
   reportButtonText: { color: '#fff', fontSize: 14, fontWeight: '600' },
 
   // Expense row
   expenseRow: { flexDirection: 'row', alignItems: 'flex-start' },
-  colorDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginTop: 4,
-    marginRight: 10,
-  },
-  largeColorDot: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    marginRight: 12,
-  },
+  colorDot: { width: 12, height: 12, borderRadius: 6, marginTop: 4, marginRight: 10 },
+  largeColorDot: { width: 24, height: 24, borderRadius: 12, marginRight: 12 },
 
   // Thumbnail
-  thumbnail: {
-    width: 56,
-    height: 56,
-    borderRadius: 8,
-    backgroundColor: '#e2e8f0',
-  },
+  thumbnail: { width: 56, height: 56, borderRadius: 8, backgroundColor: '#e2e8f0' },
   thumbnailBadge: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    elevation: 2,
+    position: 'absolute', bottom: -2, right: -2,
+    width: 20, height: 20, borderRadius: 10,
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15, shadowRadius: 2, elevation: 2,
   },
   thumbnailBadgeText: { fontSize: 10 },
 
@@ -906,28 +797,14 @@ const styles = StyleSheet.create({
 
   // Color picker
   colorLabel: { fontSize: 14, fontWeight: '500', marginBottom: 8 },
-  colorPicker: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 16,
-  },
+  colorPicker: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 16 },
   colorOption: { width: 40, height: 40, borderRadius: 20 },
   colorOptionActive: { borderWidth: 3 },
 
   // Modal
   modalOverlay: { flex: 1, justifyContent: 'flex-end' },
-  modalContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '90%',
-  },
-  modalScrollContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '92%',
-  },
+  modalContent: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '90%' },
+  modalScrollContent: { borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '92%' },
   modalInner: { padding: 20, paddingBottom: 40 },
   modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 16 },
   modalButtons: { flexDirection: 'row', gap: 12, marginTop: 16 },

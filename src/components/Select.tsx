@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
+import { selectionHaptic } from '../lib/haptics';
 
 interface Option {
   value: number | string;
@@ -36,20 +37,16 @@ export function Select({
   const [visible, setVisible] = useState(false);
 
   const selectedOption = options.find((opt) => opt.value === value);
-
-  // Use translated placeholder if none provided
   const displayPlaceholder = placeholder || t('select');
 
   return (
     <View style={styles.container}>
-      {/* Label */}
       {label ? (
         <Text style={[styles.label, { color: theme.colors.textSecondary }]}>
           {label}
         </Text>
       ) : null}
 
-      {/* Selector Button */}
       <TouchableOpacity
         activeOpacity={0.75}
         style={[
@@ -63,29 +60,19 @@ export function Select({
       >
         <View style={styles.selectedRow}>
           {selectedOption?.color ? (
-            <View
-              style={[styles.dot, { backgroundColor: selectedOption.color }]}
-            />
+            <View style={[styles.dot, { backgroundColor: selectedOption.color }]} />
           ) : null}
-
-          <Text
-            style={[
-              styles.selectorText,
-              { color: theme.colors.text },
-              !selectedOption && {
-                color: theme.colors.muted,
-                fontWeight: '500',
-              },
-            ]}
-          >
+          <Text style={[
+            styles.selectorText,
+            { color: theme.colors.text },
+            !selectedOption && { color: theme.colors.muted, fontWeight: '500' },
+          ]}>
             {selectedOption?.label || displayPlaceholder}
           </Text>
         </View>
-
         <Text style={[styles.arrow, { color: theme.colors.muted }]}>▾</Text>
       </TouchableOpacity>
 
-      {/* Dropdown Modal */}
       <Modal visible={visible} transparent animationType="fade">
         <TouchableOpacity
           activeOpacity={1}
@@ -98,26 +85,19 @@ export function Select({
               styles.modal,
               {
                 backgroundColor: theme.colors.modalBg,
-                borderColor: theme.colors.border,
+                borderColor: isDark ? theme.colors.border : 'transparent',
                 borderWidth: isDark ? 1 : 0,
               },
             ]}
             onPress={() => {}}
           >
-            {/* Modal Title */}
-            <Text
-              style={[
-                styles.modalTitle,
-                {
-                  color: theme.colors.text,
-                  borderBottomColor: theme.colors.border,
-                },
-              ]}
-            >
+            <Text style={[
+              styles.modalTitle,
+              { color: theme.colors.text, borderBottomColor: theme.colors.border },
+            ]}>
               {label || t('select')}
             </Text>
 
-            {/* Options List */}
             <FlatList
               data={options}
               keyExtractor={(item) => String(item.value)}
@@ -128,49 +108,30 @@ export function Select({
                     style={[
                       styles.option,
                       {
-                        borderBottomColor: isDark
-                          ? theme.colors.border
-                          : '#f1f5f9',
+                        borderBottomColor: isDark ? theme.colors.border : '#f1f5f9',
                         backgroundColor: isSelected
-                          ? isDark
-                            ? theme.colors.primarySoft
-                            : theme.colors.primarySoft
+                          ? theme.colors.primarySoft
                           : 'transparent',
                       },
                     ]}
                     onPress={() => {
+                      selectionHaptic();
                       onChange(item.value);
                       setVisible(false);
                     }}
                   >
                     {item.color ? (
-                      <View
-                        style={[styles.dot, { backgroundColor: item.color }]}
-                      />
+                      <View style={[styles.dot, { backgroundColor: item.color }]} />
                     ) : null}
-
-                    <Text
-                      style={[
-                        styles.optionText,
-                        { color: theme.colors.text },
-                        isSelected && {
-                          color: theme.colors.primary,
-                          fontWeight: '900',
-                        },
-                      ]}
-                    >
+                    <Text style={[
+                      styles.optionText,
+                      { color: theme.colors.text },
+                      isSelected && { color: theme.colors.primary, fontWeight: '800' },
+                    ]}>
                       {item.label}
                     </Text>
-
                     {isSelected && (
-                      <Text
-                        style={[
-                          styles.checkmark,
-                          { color: theme.colors.primary },
-                        ]}
-                      >
-                        ✓
-                      </Text>
+                      <Text style={[styles.checkmark, { color: theme.colors.primary }]}>✓</Text>
                     )}
                   </TouchableOpacity>
                 );
@@ -184,44 +145,23 @@ export function Select({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '800',
-    marginBottom: 7,
-  },
+  container: { marginBottom: 16 },
+  label: { fontSize: 13, fontWeight: '700', marginBottom: 7, letterSpacing: 0.3 },
   selector: {
     borderWidth: 1.3,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  selectedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  selectorText: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  arrow: {
-    fontSize: 18,
-    fontWeight: '900',
-    paddingHorizontal: 4,
-  },
-  overlay: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: 22,
-  },
+  selectedRow: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  selectorText: { fontSize: 15, fontWeight: '600' },
+  arrow: { fontSize: 18, fontWeight: '900', paddingHorizontal: 4 },
+  overlay: { flex: 1, justifyContent: 'center', padding: 22 },
   modal: {
-    borderRadius: 18,
+    borderRadius: 20,
     maxHeight: '70%',
     overflow: 'hidden',
     shadowColor: '#000',
@@ -232,7 +172,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: '800',
     padding: 18,
     borderBottomWidth: 1,
   },
@@ -242,19 +182,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderBottomWidth: 1,
   },
-  optionText: {
-    fontSize: 16,
-    fontWeight: '600',
-    flex: 1,
-  },
-  checkmark: {
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  dot: {
-    width: 13,
-    height: 13,
-    borderRadius: 7,
-    marginRight: 10,
-  },
+  optionText: { fontSize: 16, fontWeight: '600', flex: 1 },
+  checkmark: { fontSize: 16, fontWeight: '900' },
+  dot: { width: 13, height: 13, borderRadius: 7, marginRight: 10 },
 });

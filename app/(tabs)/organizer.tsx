@@ -56,6 +56,9 @@ import { Button } from '../../src/components/Button';
 import { Input } from '../../src/components/Input';
 import { Select } from '../../src/components/Select';
 import DatePicker from '../../src/components/DatePicker';
+import { EmptyState } from '../../src/components/EmptyState';
+import { ScreenHeader } from '../../src/components/ScreenHeader';
+import { StatPill } from '../../src/components/StatPill';
 
 type Tab = 'dashboard' | 'services' | 'refills' | 'reminders' | 'habits';
 
@@ -656,6 +659,14 @@ export default function Organizer() {
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
 
+       <ScreenHeader emoji="📒"  title={t('tab_organizer')}
+          subtitle={t('app_tagline')} >
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <StatPill emoji="🧹" label={t('active_services_label')} value={String(dashboardData?.activeServices || 0)} />
+            <StatPill emoji="🔔" label={t('organizer_reminders')} value={String(dashboardData?.todaysReminders?.length || 0)} />
+          </View>
+      </ScreenHeader>
+
       {/* Tab Bar */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         style={[styles.tabBar, { backgroundColor: isDark ? '#1e293b' : '#fff', borderBottomColor: theme.colors.border }]}
@@ -837,7 +848,13 @@ export default function Organizer() {
         {activeTab === 'services' && (
           <>
             {services.length === 0 ? (
-              <Card><Text style={[styles.empty, { color: theme.colors.muted }]}>{t('no_services_yet')}</Text></Card>
+              <Card>
+                <EmptyState
+                  emoji="🧹"
+                  title={t('no_services_yet')}
+                  actionHint={`+ ${t('add_service')}`}
+                />
+              </Card>
             ) : (
               services.map((svc) => (
                 <TouchableOpacity key={svc.id}
@@ -882,7 +899,13 @@ export default function Organizer() {
         {activeTab === 'refills' && (
           <>
             {refillItems.length === 0 ? (
-              <Card><Text style={[styles.empty, { color: theme.colors.muted }]}>{t('no_refill_items')}</Text></Card>
+              <Card>
+                <EmptyState
+                  emoji="🔄"
+                  title={t('no_refill_items')}
+                  actionHint={`+ ${t('add_refill_item')}`}
+                />
+              </Card>
             ) : (
               refillItems.map((item) => (
                 <Card key={item.id} style={styles.itemCard}>
@@ -933,7 +956,13 @@ export default function Organizer() {
         {activeTab === 'reminders' && (
           <>
             {reminders.length === 0 ? (
-              <Card><Text style={[styles.empty, { color: theme.colors.muted }]}>{t('no_reminders')}</Text></Card>
+              <Card>
+                <EmptyState
+                  emoji="🔔"
+                  title={t('no_reminders')}
+                  actionHint={`+ ${t('add_reminder')}`}
+                />
+              </Card>
             ) : (
               reminders.map((rem) => {
                 const overdue = isOverdue(rem.reminder_date);
@@ -1050,9 +1079,11 @@ export default function Organizer() {
             {/* Habits List */}
             {habits.length === 0 ? (
               <Card>
-                <Text style={[styles.empty, { color: theme.colors.muted }]}>
-                  {t('no_habits_yet')}
-                </Text>
+                <EmptyState
+                  emoji="💪"
+                  title={t('no_habits_yet')}
+                  actionHint={`+ ${t('add_habit')}`}
+                />
               </Card>
             ) : (
               habits.map((habit) => {

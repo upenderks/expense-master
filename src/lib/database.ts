@@ -846,9 +846,9 @@ async function ensureDefaultAdmin(database: SQLite.SQLiteDatabase): Promise<void
       const defaultPassword = hashPasswordSimple('admin123');
       await database.runAsync(
         'INSERT OR IGNORE INTO users (name, email, password, is_admin) VALUES (?, ?, ?, 1)',
-        ['Admin', 'admin@app.local', defaultPassword]
+        ['Admin', 'admin@digidiary.local', defaultPassword]
       );
-      console.log('✅ Default admin created (admin@app.local / admin123)');
+      //console.log('✅ Default admin created (admin@digidiary.local / admin123)');
     }
   } catch (e) {
     console.error('Admin creation error:', e);

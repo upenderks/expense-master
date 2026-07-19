@@ -23,6 +23,10 @@ import { DonutChart } from '../../src/components/charts/DonutChart';
 import { BarChart } from '../../src/components/charts/BarChart';
 import { HorizontalBarChart } from '../../src/components/charts/HorizontalBarChart';
 import DateRangeFilter from '../../src/components/DateRangeFilter';
+import { EmptyState } from '../../src/components/EmptyState';
+import { ScreenHeader } from '../../src/components/ScreenHeader';
+import { StatPill } from '../../src/components/StatPill';
+import { formatCurrency, formatCompactCurrency } from '../../src/lib/formatters';
 
 type Module = 'money' | 'expense';
 type Period = 'day' | 'week' | 'month' | 'custom';
@@ -80,8 +84,7 @@ export default function Dashboard() {
         });
 
         const totalExpenses = filtered.reduce(
-          (s: number, e: any) => s + Number(e.amount || 0),
-          0
+          (s: number, e: any) => s + Number(e.amount || 0), 0
         );
 
         const catMap: Record<number, { id: number; name: string; color: string; total: number }> = {};
@@ -161,14 +164,14 @@ export default function Dashboard() {
     setShowDateFilter(false);
   };
 
-  const formatCurrency = (amount: number) =>
-    '₹' + amount.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+  // const formatCurrency = (amount: number) =>
+  //   '₹' + amount.toLocaleString('en-IN', { maximumFractionDigits: 0 });
 
-  const formatShort = (amount: number) => {
-    if (amount >= 100000) return '₹' + (amount / 100000).toFixed(1) + 'L';
-    if (amount >= 1000) return '₹' + (amount / 1000).toFixed(1) + 'K';
-    return '₹' + amount.toFixed(0);
-  };
+  // const formatShort = (amount: number) => {
+  //   if (amount >= 100000) return '₹' + (amount / 100000).toFixed(1) + 'L';
+  //   if (amount >= 1000) return '₹' + (amount / 1000).toFixed(1) + 'K';
+  //   return '₹' + amount.toFixed(0);
+  // };
 
   const getPeriodLabel = (): string => {
     if (expensePeriod === 'custom') {
@@ -282,11 +285,7 @@ export default function Dashboard() {
           .slice(-8)
           .map(([key, total]) => {
             const [, mo] = key.split('-');
-            return {
-              label: monthNames[parseInt(mo) - 1],
-              value: total,
-              color: total > 0 ? '#ef4444' : '#e5e7eb',
-            };
+            return { label: monthNames[parseInt(mo) - 1], value: total, color: total > 0 ? '#ef4444' : '#e5e7eb' };
           });
       }
 
@@ -310,9 +309,7 @@ export default function Dashboard() {
         return Object.entries(weekMap)
           .slice(-8)
           .map(([label, total]) => ({
-            label,
-            value: total,
-            color: total > 0 ? '#ef4444' : '#e5e7eb',
+            label, value: total, color: total > 0 ? '#ef4444' : '#e5e7eb',
           }));
       }
 
@@ -352,527 +349,535 @@ export default function Dashboard() {
   // ── Render ──────────────────────────────────────────────────────────
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor={theme.colors.primary}
-        />
-      }
-    >
-      {/* Greeting */}
-      <Text style={[styles.greeting, { color: theme.colors.text }]}>
-        {t('hello')}, {user?.name}! 👋
-      </Text>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
 
-      {/* Module Toggle - only show if both modules enabled */}
-      {moneyEnabled && expenseEnabled && (
-        <View style={[
-          styles.moduleToggle,
-          { backgroundColor: isDark ? '#334155' : '#e5e7eb' },
-        ]}>
-          {(['expense', 'money'] as Module[]).map((m) => (
-            <TouchableOpacity
-              key={m}
-              style={[
-                styles.moduleButton,
-                activeModule === m && [
-                  styles.activeModule,
-                  { backgroundColor: theme.colors.surface },
-                ],
-              ]}
-              onPress={() => setActiveModule(m)}
-            >
-              <Text style={styles.moduleEmoji}>
-                {m === 'expense' ? '💸' : '💰'}
-              </Text>
-              <Text style={[
-                styles.moduleText,
-                { color: theme.colors.muted },
-                activeModule === m && {
-                  color: theme.colors.text,
-                  fontWeight: '600',
-                },
-              ]}>
-                {m === 'expense' ? t('expense') : t('money')}
-              </Text>
-            </TouchableOpacity>
-          ))}
+      {/* ── Screen Header ─────────────────────────────────────────── */}
+      <ScreenHeader
+        emoji="📊"
+        title={`${t('hello')}, ${user?.name}!`}
+        subtitle="DigiDiary"
+      >
+        <View style={styles.headerStats}>
+          {expenseEnabled && expenseData && (
+            <StatPill
+              emoji="💸"
+              label={t('total_expenses')}
+              value={formatCompactCurrency(Math.abs(expenseData.totalExpenses))}
+            />
+          )}
+          {moneyEnabled && moneyData && (
+            <StatPill
+              emoji="📊"
+              label={t('outstanding')}
+              value={formatCompactCurrency(Math.abs(moneyData.outstanding))}
+            />
+          )}
+          {/* {moneyEnabled && moneyData && (
+            <StatPill
+              emoji="👥"
+              label={t('borrowers')}
+              value={String(moneyData.borrowerCount)}
+            />
+          )} */}
         </View>
-      )}
+      </ScreenHeader>
 
-      {/* ─── EXPENSE DASHBOARD ───────────────────────────────────────── */}
-      {expenseEnabled && activeModule === 'expense' && expenseData && (
-        <>
-          {/* Period Selector */}
+      {/* ── Scrollable Content ────────────────────────────────────── */}
+      <ScrollView
+        style={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={theme.colors.primary}
+          />
+        }
+      >
+        {/* Module Toggle - only show if both modules enabled */}
+        {moneyEnabled && expenseEnabled && (
           <View style={[
-            styles.periodToggle,
+            styles.moduleToggle,
             { backgroundColor: isDark ? '#334155' : '#e5e7eb' },
           ]}>
-            {(['day', 'week', 'month', 'custom'] as Period[]).map((p) => (
+            {(['expense', 'money'] as Module[]).map((m) => (
               <TouchableOpacity
-                key={p}
+                key={m}
                 style={[
-                  styles.periodButton,
-                  expensePeriod === p && [
-                    styles.activePeriod,
+                  styles.moduleButton,
+                  activeModule === m && [
+                    styles.activeModule,
                     { backgroundColor: theme.colors.surface },
                   ],
                 ]}
-                onPress={() => handlePeriodChange(p)}
+                onPress={() => setActiveModule(m)}
               >
+                <Text style={styles.moduleEmoji}>
+                  {m === 'expense' ? '💸' : '💰'}
+                </Text>
                 <Text style={[
-                  styles.periodText,
+                  styles.moduleText,
                   { color: theme.colors.muted },
-                  expensePeriod === p && {
-                    color: theme.colors.primary,
+                  activeModule === m && {
+                    color: theme.colors.text,
                     fontWeight: '600',
                   },
                 ]}>
-                  {p === 'custom' ? '📅 ' : ''}
-                  {p === 'day' ? t('day')
-                    : p === 'week' ? t('week')
-                    : p === 'month' ? t('month')
-                    : t('custom')}
+                  {m === 'expense' ? t('expense') : t('money')}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
+        )}
 
-          {/* Custom Date Filter */}
-          {(expensePeriod === 'custom' || showDateFilter) && (
-            <View style={{ marginBottom: 12 }}>
-              <DateRangeFilter
-                startDate={customStartDate}
-                endDate={customEndDate}
-                onChange={handleDateFilterChange}
-                onClear={handleClearDateFilter}
-                title={`📅 ${t('custom_date_range')}`}
-              />
-            </View>
-          )}
-
-          {/* Total Card */}
-          <Card style={[
-            styles.totalCard,
-            { backgroundColor: isDark ? theme.colors.dangerSoft : '#fef2f2' },
-          ]}>
-            <Text style={[styles.totalLabel, { color: theme.colors.muted }]}>
-              {t('total_expenses')} ({getPeriodLabel()})
-            </Text>
-            <Text style={[styles.totalValue, { color: theme.colors.danger }]}>
-              {formatCurrency(expenseData.totalExpenses)}
-            </Text>
+        {/* ─── EXPENSE DASHBOARD ──────────────────────────────────── */}
+        {expenseEnabled && activeModule === 'expense' && expenseData && (
+          <>
+            {/* Period Selector */}
             <View style={[
-              styles.totalMeta,
-              {
-                backgroundColor: isDark
-                  ? 'rgba(255,255,255,0.05)'
-                  : 'rgba(0,0,0,0.04)',
-              },
+              styles.periodToggle,
+              { backgroundColor: isDark ? '#334155' : '#e5e7eb' },
             ]}>
-              <View style={styles.totalMetaItem}>
-                <Text style={[styles.totalMetaLabel, { color: theme.colors.muted }]}>
-                  {t('categories')}
-                </Text>
-                <Text style={[styles.totalMetaValue, { color: theme.colors.text }]}>
-                  {expenseData.categoryTotals.filter((c: any) => c.total > 0).length}
-                </Text>
-              </View>
-              <View style={[styles.totalMetaDivider, { backgroundColor: theme.colors.border }]} />
-              <View style={styles.totalMetaItem}>
-                <Text style={[styles.totalMetaLabel, { color: theme.colors.muted }]}>
-                  {t('transactions')}
-                </Text>
-                <Text style={[styles.totalMetaValue, { color: theme.colors.text }]}>
-                  {expenseData.allFilteredExpenses?.length ||
-                    expenseData.recentExpenses?.length ||
-                    0}
-                </Text>
-              </View>
-            </View>
-          </Card>
-
-          {/* Donut Chart */}
-          {chartsEnabled && (
-            <Card style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-                🥧 {t('category_breakdown')}
-              </Text>
-              <DonutChart
-                data={expenseDonutData}
-                size={190}
-                strokeWidth={30}
-                centerLabel={t('total')}
-                centerValue={formatShort(expenseData.totalExpenses)}
-              />
-            </Card>
-          )}
-
-          {/* Bar Chart */}
-          {chartsEnabled && (
-            <Card style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-                📊 {getBarChartTitle()}
-              </Text>
-              <BarChart
-                data={expenseBarData}
-                barColor="#ef4444"
-                height={160}
-                formatValue={formatShort}
-              />
-            </Card>
-          )}
-
-          {/* Category Progress */}
-          <Card style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-              🏷️ {t('by_category')}
-            </Text>
-            {expenseData.categoryTotals.filter((c: any) => c.total > 0).length === 0 ? (
-              <Text style={[styles.emptyText, { color: theme.colors.muted }]}>
-                {t('no_expenses_period')}
-              </Text>
-            ) : (
-              expenseData.categoryTotals
-                .filter((c: any) => c.total > 0)
-                .sort((a: any, b: any) => b.total - a.total)
-                .map((cat: any) => {
-                  const pct =
-                    expenseData.totalExpenses > 0
-                      ? (cat.total / expenseData.totalExpenses) * 100
-                      : 0;
-                  return (
-                    <View key={cat.id} style={styles.categoryRow}>
-                      <View style={styles.categoryHeader}>
-                        <View
-                          style={[styles.categoryDot, { backgroundColor: cat.color }]}
-                        />
-                        <Text style={[styles.categoryName, { color: theme.colors.text }]}>
-                          {cat.name}
-                        </Text>
-                        <Text style={[styles.categoryPct, { color: theme.colors.muted }]}>
-                          {pct.toFixed(1)}%
-                        </Text>
-                        <Text style={[styles.categoryAmount, { color: theme.colors.text }]}>
-                          {formatCurrency(cat.total)}
-                        </Text>
-                      </View>
-                      <View style={[
-                        styles.progressBar,
-                        { backgroundColor: isDark ? '#334155' : '#f3f4f6' },
-                      ]}>
-                        <View style={[
-                          styles.progressFill,
-                          { width: `${pct}%`, backgroundColor: cat.color },
-                        ]} />
-                      </View>
-                    </View>
-                  );
-                })
-            )}
-          </Card>
-
-          {/* Recent Expenses */}
-          <Card style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-                📋 {t('recent_expenses')}
-              </Text>
-              <TouchableOpacity onPress={() => router.push('/(tabs)/expenses')}>
-                <Text style={[styles.viewAll, { color: theme.colors.primary }]}>
-                  {t('view_all')} →
-                </Text>
-              </TouchableOpacity>
-            </View>
-            {expenseData.recentExpenses.length === 0 ? (
-              <Text style={[styles.emptyText, { color: theme.colors.muted }]}>
-                {t('no_expenses_yet')}
-              </Text>
-            ) : (
-              expenseData.recentExpenses.slice(0, 5).map((e: any) => (
-                <View
-                  key={e.id}
-                  style={[styles.expenseRow, { borderBottomColor: theme.colors.border }]}
+              {(['day', 'week', 'month', 'custom'] as Period[]).map((p) => (
+                <TouchableOpacity
+                  key={p}
+                  style={[
+                    styles.periodButton,
+                    expensePeriod === p && [
+                      styles.activePeriod,
+                      { backgroundColor: theme.colors.surface },
+                    ],
+                  ]}
+                  onPress={() => handlePeriodChange(p)}
                 >
-                  <View style={[
-                    styles.categoryDotSmall,
-                    { backgroundColor: e.category_color },
-                  ]} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.expenseCategory, { color: theme.colors.text }]}>
-                      {e.category_name}
-                    </Text>
-                    <Text style={[styles.expenseDate, { color: theme.colors.muted }]}>
-                      {e.date}
-                    </Text>
-                  </View>
-                  <Text style={[styles.expenseAmount, { color: theme.colors.danger }]}>
-                    -{formatCurrency(e.amount)}
+                  <Text style={[
+                    styles.periodText,
+                    { color: theme.colors.muted },
+                    expensePeriod === p && {
+                      color: theme.colors.primary,
+                      fontWeight: '600',
+                    },
+                  ]}>
+                    {p === 'custom' ? '📅 ' : ''}
+                    {p === 'day' ? t('day')
+                      : p === 'week' ? t('week')
+                      : p === 'month' ? t('month')
+                      : t('custom')}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Custom Date Filter */}
+            {(expensePeriod === 'custom' || showDateFilter) && (
+              <View style={{ marginBottom: 12 }}>
+                <DateRangeFilter
+                  startDate={customStartDate}
+                  endDate={customEndDate}
+                  onChange={handleDateFilterChange}
+                  onClear={handleClearDateFilter}
+                  title={`📅 ${t('custom_date_range')}`}
+                />
+              </View>
+            )}
+
+            {/* Total Card */}
+            <Card style={[
+              styles.totalCard,
+              { backgroundColor: isDark ? theme.colors.dangerSoft : '#fef2f2' },
+            ]}>
+              <Text style={[styles.totalLabel, { color: theme.colors.muted }]}>
+                {t('total_expenses')} ({getPeriodLabel()})
+              </Text>
+              <Text style={[styles.totalValue, { color: theme.colors.danger }]}>
+                {formatCurrency(expenseData.totalExpenses)}
+              </Text>
+              <View style={[
+                styles.totalMeta,
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(255,255,255,0.05)'
+                    : 'rgba(0,0,0,0.04)',
+                },
+              ]}>
+                <View style={styles.totalMetaItem}>
+                  <Text style={[styles.totalMetaLabel, { color: theme.colors.muted }]}>
+                    {t('categories')}
+                  </Text>
+                  <Text style={[styles.totalMetaValue, { color: theme.colors.text }]}>
+                    {expenseData.categoryTotals.filter((c: any) => c.total > 0).length}
                   </Text>
                 </View>
-              ))
-            )}
-          </Card>
-        </>
-      )}
+                <View style={[styles.totalMetaDivider, { backgroundColor: theme.colors.border }]} />
+                <View style={styles.totalMetaItem}>
+                  <Text style={[styles.totalMetaLabel, { color: theme.colors.muted }]}>
+                    {t('transactions')}
+                  </Text>
+                  <Text style={[styles.totalMetaValue, { color: theme.colors.text }]}>
+                    {expenseData.allFilteredExpenses?.length || expenseData.recentExpenses?.length || 0}
+                  </Text>
+                </View>
+              </View>
+            </Card>
 
-      {/* ─── MONEY DASHBOARD ─────────────────────────────────────────── */}
-      {moneyEnabled && activeModule === 'money' && moneyData && (
-        <>
-          {/* Stats Grid */}
-          <View style={styles.statsGrid}>
-            {[
-              {
-                emoji: '💸',
-                label: t('total_given'),
-                value: formatCurrency(moneyData.totalGiven),
-                color: '#dc2626',
-                bg: isDark ? '#450a0a' : '#ecfdf5',
-              },
-              {
-                emoji: '💰',
-                label: t('total_received'),
-                value: formatCurrency(moneyData.totalReceived),
-                color: '#059669',
-                bg: isDark ? '#064e3b' : '#eff6ff',
-              },
-              {
-                emoji: '📊',
-                label: t('outstanding'),
-                value: formatCurrency(Math.abs(moneyData.outstanding)),
-                color:
-                  moneyData.outstanding > 0
-                    ? '#dc2626'
-                    : moneyData.outstanding < 0
-                    ? '#059669'
-                    : theme.colors.muted,
-                bg: isDark ? '#451a03' : '#fff7ed',
-              },
-              {
-                emoji: '👥',
-                label: t('borrowers'),
-                value: String(moneyData.borrowerCount),
-                color: theme.colors.text,
-                bg: isDark ? '#2e1065' : '#f3e8ff',
-              },
-            ].map((item, i) => (
-              <Card key={i} style={[styles.statCard, { backgroundColor: item.bg }]}>
-                <Text style={styles.statEmoji}>{item.emoji}</Text>
-                <Text style={[styles.statLabel, { color: theme.colors.muted }]}>
-                  {item.label}
+            {/* Donut Chart */}
+            {chartsEnabled && (
+              <Card style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                  🥧 {t('category_breakdown')}
                 </Text>
-                <Text style={[styles.statValue, { color: item.color }]}>
-                  {item.value}
-                </Text>
+                <DonutChart
+                  data={expenseDonutData}
+                  size={190}
+                  strokeWidth={30}
+                  centerLabel={t('total')}
+                  centerValue={formatCompactCurrency(expenseData.totalExpenses)}
+                />
               </Card>
-            ))}
-          </View>
+            )}
 
-          {/* Given vs Received */}
-          {chartsEnabled && (
+            {/* Bar Chart */}
+            {chartsEnabled && (
+              <Card style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                  📊 {getBarChartTitle()}
+                </Text>
+                <BarChart
+                  data={expenseBarData}
+                  barColor="#ef4444"
+                  height={160}
+                  formatValue={formatCompactCurrency}
+                />
+              </Card>
+            )}
+
+            {/* Category Progress */}
             <Card style={styles.section}>
               <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-                📊 {t('given_vs_received')}
+                🏷️ {t('by_category')}
               </Text>
-              <HorizontalBarChart
-                data={moneyComparisonData}
-                formatValue={formatShort}
-              />
-              <View style={styles.comparisonSummary}>
-                <View style={[
-                  styles.comparisonBadge,
-                  {
-                    backgroundColor:
-                      moneyData.outstanding > 0
+              {expenseData.categoryTotals.filter((c: any) => c.total > 0).length === 0 ? (
+                <EmptyState
+                  emoji="💸"
+                  title={t('no_expenses_period')}
+                />
+              ) : (
+                expenseData.categoryTotals
+                  .filter((c: any) => c.total > 0)
+                  .sort((a: any, b: any) => b.total - a.total)
+                  .map((cat: any) => {
+                    const pct = expenseData.totalExpenses > 0
+                      ? (cat.total / expenseData.totalExpenses) * 100
+                      : 0;
+                    return (
+                      <View key={cat.id} style={styles.categoryRow}>
+                        <View style={styles.categoryHeader}>
+                          <View style={[styles.categoryDot, { backgroundColor: cat.color }]} />
+                          <Text style={[styles.categoryName, { color: theme.colors.text }]}>
+                            {cat.name}
+                          </Text>
+                          <Text style={[styles.categoryPct, { color: theme.colors.muted }]}>
+                            {pct.toFixed(1)}%
+                          </Text>
+                          <Text style={[styles.categoryAmount, { color: theme.colors.text }]}>
+                            {formatCurrency(cat.total)}
+                          </Text>
+                        </View>
+                        <View style={[
+                          styles.progressBar,
+                          { backgroundColor: isDark ? '#334155' : '#f3f4f6' },
+                        ]}>
+                          <View style={[
+                            styles.progressFill,
+                            { width: `${pct}%`, backgroundColor: cat.color },
+                          ]} />
+                        </View>
+                      </View>
+                    );
+                  })
+              )}
+            </Card>
+
+            {/* Recent Expenses */}
+            <Card style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                  📋 {t('recent_expenses')}
+                </Text>
+                <TouchableOpacity onPress={() => router.push('/(tabs)/expenses')}>
+                  <Text style={[styles.viewAll, { color: theme.colors.primary }]}>
+                    {t('view_all')} →
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              {expenseData.recentExpenses.length === 0 ? (
+                <EmptyState
+                  emoji="💸"
+                  title={t('no_expenses_yet')}
+                  subtitle={t('app_tagline')}
+                  actionHint={`+ ${t('add_expense')}`}
+                />
+              ) : (
+                expenseData.recentExpenses.slice(0, 5).map((e: any) => (
+                  <View
+                    key={e.id}
+                    style={[styles.expenseRow, { borderBottomColor: theme.colors.border }]}
+                  >
+                    <View style={[styles.categoryDotSmall, { backgroundColor: e.category_color }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.expenseCategory, { color: theme.colors.text }]}>
+                        {e.category_name}
+                      </Text>
+                      <Text style={[styles.expenseDate, { color: theme.colors.muted }]}>
+                        {e.date}
+                      </Text>
+                    </View>
+                    <Text style={[styles.expenseAmount, { color: theme.colors.danger }]}>
+                      -{formatCurrency(e.amount)}
+                    </Text>
+                  </View>
+                ))
+              )}
+            </Card>
+          </>
+        )}
+
+        {/* ─── MONEY DASHBOARD ──────────────────────────────────────── */}
+        {moneyEnabled && activeModule === 'money' && moneyData && (
+          <>
+            {/* Stats Grid */}
+            <View style={styles.statsGrid}>
+              {[
+                {
+                  emoji: '💸',
+                  label: t('total_given'),
+                  value: formatCurrency(moneyData.totalGiven),
+                  color: '#dc2626',
+                  bg: isDark ? '#450a0a' : '#ecfdf5',
+                },
+                {
+                  emoji: '💰',
+                  label: t('total_received'),
+                  value: formatCurrency(moneyData.totalReceived),
+                  color: '#059669',
+                  bg: isDark ? '#064e3b' : '#eff6ff',
+                },
+                {
+                  emoji: '📊',
+                  label: t('outstanding'),
+                  value: formatCurrency(Math.abs(moneyData.outstanding)),
+                  color: moneyData.outstanding > 0 ? '#dc2626' : moneyData.outstanding < 0 ? '#059669' : theme.colors.muted,
+                  bg: isDark ? '#451a03' : '#fff7ed',
+                },
+                {
+                  emoji: '👥',
+                  label: t('borrowers'),
+                  value: String(moneyData.borrowerCount),
+                  color: theme.colors.text,
+                  bg: isDark ? '#2e1065' : '#f3e8ff',
+                },
+              ].map((item, i) => (
+                <Card key={i} style={[styles.statCard, { backgroundColor: item.bg }]}>
+                  <Text style={styles.statEmoji}>{item.emoji}</Text>
+                  <Text style={[styles.statLabel, { color: theme.colors.muted }]}>{item.label}</Text>
+                  <Text style={[styles.statValue, { color: item.color }]}>{item.value}</Text>
+                </Card>
+              ))}
+            </View>
+
+            {/* Given vs Received */}
+            {chartsEnabled && (
+              <Card style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                  📊 {t('given_vs_received')}
+                </Text>
+                <HorizontalBarChart data={moneyComparisonData} formatValue={formatCompactCurrency} />
+                <View style={styles.comparisonSummary}>
+                  <View style={[
+                    styles.comparisonBadge,
+                    {
+                      backgroundColor: moneyData.outstanding > 0
                         ? isDark ? '#450a0a' : '#fef2f2'
                         : moneyData.outstanding < 0
                         ? isDark ? '#064e3b' : '#ecfdf5'
                         : isDark ? '#1e293b' : '#f9fafb',
-                  },
-                ]}>
-                  <Text style={[styles.comparisonBadgeLabel, { color: theme.colors.muted }]}>
-                    {moneyData.outstanding > 0
-                      ? t('to_receive')
-                      : moneyData.outstanding < 0
-                      ? t('to_pay')
-                      : t('settled')}
-                  </Text>
-                  <Text style={[
-                    styles.comparisonBadgeValue,
-                    {
-                      color:
-                        moneyData.outstanding > 0
-                          ? '#dc2626'
-                          : moneyData.outstanding < 0
-                          ? '#059669'
-                          : theme.colors.muted,
                     },
                   ]}>
-                    {formatCurrency(Math.abs(moneyData.outstanding))}
-                  </Text>
-                </View>
-              </View>
-            </Card>
-          )}
-
-          {/* Borrower Balances Chart */}
-          {chartsEnabled && (
-            <Card style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-                👥 {t('borrower_balances')}
-              </Text>
-              {borrowerChartData.length === 0 ? (
-                <Text style={[styles.emptyText, { color: theme.colors.muted }]}>
-                  {t('no_outstanding')}
-                </Text>
-              ) : (
-                <HorizontalBarChart
-                  data={borrowerChartData}
-                  formatValue={formatShort}
-                />
-              )}
-            </Card>
-          )}
-
-          {/* Borrower List */}
-          <Card style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-                📋 {t('borrower_details')}
-              </Text>
-              <TouchableOpacity onPress={() => router.push('/(tabs)/money')}>
-                <Text style={[styles.viewAll, { color: theme.colors.primary }]}>
-                  {t('view_all')} →
-                </Text>
-              </TouchableOpacity>
-            </View>
-            {moneyData.borrowerBalances.length === 0 ? (
-              <Text style={[styles.emptyText, { color: theme.colors.muted }]}>
-                {t('no_borrowers_yet')}
-              </Text>
-            ) : (
-              moneyData.borrowerBalances.slice(0, 5).map((b: any) => (
-                <View
-                  key={b.id}
-                  style={[styles.borrowerRow, { borderBottomColor: theme.colors.border }]}
-                >
-                  <View style={[
-                    styles.borrowerAvatar,
-                    { backgroundColor: theme.colors.primary },
-                  ]}>
-                    <Text style={styles.borrowerAvatarText}>
-                      {b.name.charAt(0).toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={styles.borrowerInfo}>
-                    <Text style={[styles.borrowerName, { color: theme.colors.text }]}>
-                      {b.name}
-                    </Text>
-                    {b.phone && (
-                      <Text style={[styles.borrowerMeta, { color: theme.colors.muted }]}>
-                        📞 {b.phone}
-                      </Text>
-                    )}
-                  </View>
-                  <View style={styles.borrowerBalanceContainer}>
-                    <Text style={[
-                      styles.borrowerBalance,
-                      b.balance > 0
-                        ? styles.positive
-                        : b.balance < 0
-                        ? styles.negative
-                        : { color: theme.colors.muted },
-                    ]}>
-                      {formatCurrency(Math.abs(b.balance))}
-                    </Text>
-                    <Text style={[
-                      styles.borrowerBalanceLabel,
-                      b.balance > 0
-                        ? styles.positive
-                        : b.balance < 0
-                        ? styles.negative
-                        : { color: theme.colors.muted },
-                    ]}>
-                      {b.balance > 0
-                        ? t('owes_you')
-                        : b.balance < 0
-                        ? t('you_owe')
+                    <Text style={[styles.comparisonBadgeLabel, { color: theme.colors.muted }]}>
+                      {moneyData.outstanding > 0
+                        ? t('to_receive')
+                        : moneyData.outstanding < 0
+                        ? t('to_pay')
                         : t('settled')}
                     </Text>
+                    <Text style={[
+                      styles.comparisonBadgeValue,
+                      {
+                        color: moneyData.outstanding > 0 ? '#dc2626'
+                          : moneyData.outstanding < 0 ? '#059669'
+                          : theme.colors.muted,
+                      },
+                    ]}>
+                      {formatCurrency(Math.abs(moneyData.outstanding))}
+                    </Text>
                   </View>
                 </View>
-              ))
+              </Card>
             )}
-          </Card>
 
-          {/* Recent Transactions */}
-          <Card style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-                🔄 {t('recent_transactions')}
-              </Text>
-              <TouchableOpacity onPress={() => router.push('/(tabs)/money')}>
-                <Text style={[styles.viewAll, { color: theme.colors.primary }]}>
-                  {t('view_all')} →
+            {/* Borrower Balances Chart */}
+            {chartsEnabled && (
+              <Card style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                  👥 {t('borrower_balances')}
                 </Text>
-              </TouchableOpacity>
-            </View>
-            {moneyData.recentTransactions.length === 0 ? (
-              <Text style={[styles.emptyText, { color: theme.colors.muted }]}>
-                {t('no_transactions_yet')}
-              </Text>
-            ) : (
-              moneyData.recentTransactions.map((tx: any) => (
-                <View
-                  key={tx.id}
-                  style={[styles.transactionRow, { borderBottomColor: theme.colors.border }]}
-                >
-                  <View style={[
-                    styles.transactionIcon,
-                    {
-                      backgroundColor:
-                        tx.type === 'given'
+                {borrowerChartData.length === 0 ? (
+                  <EmptyState
+                    emoji="✅"
+                    title={t('no_outstanding')}
+                  />
+                ) : (
+                  <HorizontalBarChart data={borrowerChartData} formatValue={formatCompactCurrency} />
+                )}
+              </Card>
+            )}
+
+            {/* Borrower List */}
+            <Card style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                  📋 {t('borrower_details')}
+                </Text>
+                <TouchableOpacity onPress={() => router.push('/(tabs)/money')}>
+                  <Text style={[styles.viewAll, { color: theme.colors.primary }]}>
+                    {t('view_all')} →
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              {moneyData.borrowerBalances.length === 0 ? (
+                <EmptyState
+                  emoji="👥"
+                  title={t('no_borrowers_yet')}
+                  actionHint={`+ ${t('add_borrower')}`}
+                />
+              ) : (
+                moneyData.borrowerBalances.slice(0, 5).map((b: any) => (
+                  <View
+                    key={b.id}
+                    style={[styles.borrowerRow, { borderBottomColor: theme.colors.border }]}
+                  >
+                    <View style={[styles.borrowerAvatar, { backgroundColor: theme.colors.primary }]}>
+                      <Text style={styles.borrowerAvatarText}>
+                        {b.name.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={styles.borrowerInfo}>
+                      <Text style={[styles.borrowerName, { color: theme.colors.text }]}>
+                        {b.name}
+                      </Text>
+                      {b.phone && (
+                        <Text style={[styles.borrowerMeta, { color: theme.colors.muted }]}>
+                          📞 {b.phone}
+                        </Text>
+                      )}
+                    </View>
+                    <View style={styles.borrowerBalanceContainer}>
+                      <Text style={[
+                        styles.borrowerBalance,
+                        b.balance > 0 ? styles.positive
+                          : b.balance < 0 ? styles.negative
+                          : { color: theme.colors.muted },
+                      ]}>
+                        {formatCurrency(Math.abs(b.balance))}
+                      </Text>
+                      <Text style={[
+                        styles.borrowerBalanceLabel,
+                        b.balance > 0 ? styles.positive
+                          : b.balance < 0 ? styles.negative
+                          : { color: theme.colors.muted },
+                      ]}>
+                        {b.balance > 0 ? t('owes_you')
+                          : b.balance < 0 ? t('you_owe')
+                          : t('settled')}
+                      </Text>
+                    </View>
+                  </View>
+                ))
+              )}
+            </Card>
+
+            {/* Recent Transactions */}
+            <Card style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                  🔄 {t('recent_transactions')}
+                </Text>
+                <TouchableOpacity onPress={() => router.push('/(tabs)/money')}>
+                  <Text style={[styles.viewAll, { color: theme.colors.primary }]}>
+                    {t('view_all')} →
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              {moneyData.recentTransactions.length === 0 ? (
+                <EmptyState
+                  emoji="💱"
+                  title={t('no_transactions_yet')}
+                />
+              ) : (
+                moneyData.recentTransactions.map((tx: any) => (
+                  <View
+                    key={tx.id}
+                    style={[styles.transactionRow, { borderBottomColor: theme.colors.border }]}
+                  >
+                    <View style={[
+                      styles.transactionIcon,
+                      {
+                        backgroundColor: tx.type === 'given'
                           ? isDark ? '#450a0a' : '#fef2f2'
                           : isDark ? '#064e3b' : '#ecfdf5',
-                    },
-                  ]}>
-                    <Text style={styles.transactionIconText}>
-                      {tx.type === 'given' ? '↗️' : '↙️'}
+                      },
+                    ]}>
+                      <Text style={styles.transactionIconText}>
+                        {tx.type === 'given' ? '↗️' : '↙️'}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 10 }}>
+                      <Text style={[styles.transactionName, { color: theme.colors.text }]}>
+                        {tx.borrower_name}
+                      </Text>
+                      <Text style={[styles.transactionDate, { color: theme.colors.muted }]}>
+                        {tx.date}
+                      </Text>
+                    </View>
+                    <Text style={[
+                      styles.transactionAmount,
+                      tx.type === 'given' ? styles.negative : styles.positive,
+                    ]}>
+                      {tx.type === 'given' ? '-' : '+'}{formatCurrency(tx.amount)}
                     </Text>
                   </View>
-                  <View style={{ flex: 1, marginLeft: 10 }}>
-                    <Text style={[styles.transactionName, { color: theme.colors.text }]}>
-                      {tx.borrower_name}
-                    </Text>
-                    <Text style={[styles.transactionDate, { color: theme.colors.muted }]}>
-                      {tx.date}
-                    </Text>
-                  </View>
-                  <Text style={[
-                    styles.transactionAmount,
-                    tx.type === 'given' ? styles.negative : styles.positive,
-                  ]}>
-                    {tx.type === 'given' ? '-' : '+'}{formatCurrency(tx.amount)}
-                  </Text>
-                </View>
-              ))
-            )}
-          </Card>
-        </>
-      )}
+                ))
+              )}
+            </Card>
+          </>
+        )}
 
-      <View style={{ height: 30 }} />
-    </ScrollView>
+        <View style={{ height: 30 }} />
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16 },
+  container: { flex: 1 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  greeting: { fontSize: 24, fontWeight: 'bold', marginBottom: 16 },
+  scrollContent: { flex: 1, padding: 16 },
+
+  // Header stats row
+  headerStats: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
 
   // Module toggle
   moduleToggle: {

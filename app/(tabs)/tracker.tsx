@@ -34,6 +34,10 @@ import { Card } from '../../src/components/Card';
 import { Button } from '../../src/components/Button';
 import { Input } from '../../src/components/Input';
 import { Select } from '../../src/components/Select';
+import { EmptyState } from '../../src/components/EmptyState';
+import { ScreenHeader } from '../../src/components/ScreenHeader';
+import { StatPill } from '../../src/components/StatPill';
+import { formatCurrency, formatCompactCurrency } from '../../src/lib/formatters';
 
 type Tab = 'dashboard' | 'logs' | 'customers' | 'assets';
 
@@ -201,9 +205,8 @@ export default function Tracker() {
     }
   };
 
-  const getPickerMode = (): 'date' | 'time' => {
-    return (showPicker === 'startDate' || showPicker === 'endDate') ? 'date' : 'time';
-  };
+  const getPickerMode = (): 'date' | 'time' =>
+    (showPicker === 'startDate' || showPicker === 'endDate') ? 'date' : 'time';
 
   const getPickerTitle = (): string => {
     switch (showPicker) {
@@ -235,25 +238,18 @@ export default function Tracker() {
       const hasEnd = !!log.end_time && log.status === 'completed';
       const endDt = hasEnd ? new Date(log.end_time) : new Date();
       setLogForm({
-        assetId: log.asset_id,
-        customerId: log.customer_id,
-        startDate: startDt,
-        startTime: startDt,
-        hasEndTime: hasEnd,
-        endDate: endDt,
-        endTime: endDt,
-        hourlyRate: String(log.hourly_rate),
-        notes: log.notes || '',
+        assetId: log.asset_id, customerId: log.customer_id,
+        startDate: startDt, startTime: startDt,
+        hasEndTime: hasEnd, endDate: endDt, endTime: endDt,
+        hourlyRate: String(log.hourly_rate), notes: log.notes || '',
       });
     } else {
       setEditingLog(null);
       const now = new Date();
       setLogForm({
         assetId: '', customerId: '',
-        startDate: now, startTime: now,
-        hasEndTime: false,
-        endDate: now, endTime: now,
-        hourlyRate: '', notes: '',
+        startDate: now, startTime: now, hasEndTime: false,
+        endDate: now, endTime: now, hourlyRate: '', notes: '',
       });
     }
     setLogModal(true);
@@ -289,14 +285,12 @@ export default function Tracker() {
         await updateTimeLog(
           editingLog.id, user!.id, Number(logForm.assetId),
           Number(logForm.customerId), startIso,
-          endIso || '', durationMins, rate, totalAmount,
-          logForm.notes
+          endIso || '', durationMins, rate, totalAmount, logForm.notes
         );
       } else {
         await createTimeLog(
           user!.id, Number(logForm.assetId), Number(logForm.customerId),
-          startIso, endIso || '', durationMins, rate, totalAmount,
-          logForm.notes
+          startIso, endIso || '', durationMins, rate, totalAmount, logForm.notes
         );
       }
       setLogModal(false);
@@ -393,8 +387,14 @@ export default function Tracker() {
 
   // ── Helpers ────────────────────────────────────────────────────────
 
-  const formatCurrency = (amount: number) =>
-    '₹' + Number(amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+  // const formatCurrency = (amount: number) =>
+  //   '₹' + Number(amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+
+  // const formatShort = (amount: number) => {
+  //   if (amount >= 100000) return '₹' + (amount / 100000).toFixed(1) + 'L';
+  //   if (amount >= 1000) return '₹' + (amount / 1000).toFixed(1) + 'K';
+  //   return '₹' + amount.toFixed(0);
+  // };
 
   const handleLogAssetChange = (assetId: number | string) => {
     const asset = assets.find((a) => a.id === Number(assetId));
@@ -409,10 +409,7 @@ export default function Tracker() {
     { value: 'other', label: t('type_other') },
   ];
 
-  // Check if a log is in progress
   const isInProgress = (log: any) => !log.end_time || log.status === 'running';
-
-  // Separate logs
   const inProgressLogs = timeLogs.filter(isInProgress);
   const completedLogs = timeLogs.filter((l) => !isInProgress(l));
 
@@ -421,7 +418,32 @@ export default function Tracker() {
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
 
-      {/* Tab Bar */}
+      {/* ── Screen Header ─────────────────────────────────────────── */}
+      <ScreenHeader
+        emoji="⏱️"
+        title={t('tab_tracker')}
+        subtitle={`${t('total_revenue')}: ${formatCompactCurrency(dashboardData?.totalRevenue || 0)}`}
+      >
+        <View style={styles.headerStats}>
+          {/* <StatPill
+            emoji="🚜"
+            label={t('active_assets')}
+            value={String(dashboardData?.totalAssets || 0)}
+          /> */}
+          <StatPill
+            emoji="👥"
+            label={t('tracker_customers')}
+            value={String(dashboardData?.totalCustomers || 0)}
+          />
+          <StatPill
+            emoji="⚠️"
+            label={t('outstanding_amount')}
+            value={formatCompactCurrency(dashboardData?.outstanding || 0)}
+          />
+        </View>
+      </ScreenHeader>
+
+      {/* ── Tab Bar ───────────────────────────────────────────────── */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         style={[styles.tabBar, { backgroundColor: isDark ? '#1e293b' : '#fff', borderBottomColor: theme.colors.border }]}
         contentContainerStyle={styles.tabBarContent}
@@ -506,9 +528,7 @@ export default function Tracker() {
                       <View style={[styles.inProgressBadge, { backgroundColor: '#fef3c7' }]}>
                         <Text style={styles.inProgressBadgeText}>🔄 In Progress</Text>
                       </View>
-                      <Text style={[styles.tapToComplete, { color: '#d97706' }]}>
-                        Tap to complete →
-                      </Text>
+                      <Text style={[styles.tapToComplete, { color: '#d97706' }]}>Tap to complete →</Text>
                     </View>
                   </TouchableOpacity>
                 ))}
@@ -519,7 +539,12 @@ export default function Tracker() {
             <Card style={styles.section}>
               <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>📋 {t('recent_jobs')}</Text>
               {(dashboardData?.recentLogs || []).filter((l: any) => l.end_time).length === 0 ? (
-                <Text style={[styles.empty, { color: theme.colors.muted }]}>{t('no_jobs_yet')}</Text>
+                <EmptyState
+                  emoji="⏱️"
+                  title={t('no_jobs_yet')}
+                  subtitle={t('app_tagline')}
+                  actionHint={`+ ${t('add_log')}`}
+                />
               ) : (
                 (dashboardData?.recentLogs || []).filter((l: any) => l.end_time).map((log: any) => (
                   <View key={log.id} style={[styles.logRow, { borderBottomColor: theme.colors.border }]}>
@@ -568,7 +593,9 @@ export default function Tracker() {
         {activeTab === 'assets' && (
           <>
             {assets.length === 0 ? (
-              <Card><Text style={[styles.empty, { color: theme.colors.muted }]}>{t('no_assets_yet')}</Text></Card>
+              <Card>
+                <EmptyState emoji="🚜" title={t('no_assets_yet')} actionHint={`+ ${t('add_asset')}`} />
+              </Card>
             ) : assets.map((a) => (
               <Card key={a.id} style={[styles.itemCard, { opacity: a.is_active ? 1 : 0.6 }]}>
                 <View style={styles.assetRow}>
@@ -599,7 +626,9 @@ export default function Tracker() {
         {activeTab === 'customers' && (
           <>
             {customers.length === 0 ? (
-              <Card><Text style={[styles.empty, { color: theme.colors.muted }]}>{t('no_customers_yet')}</Text></Card>
+              <Card>
+                <EmptyState emoji="👥" title={t('no_customers_yet')} actionHint={`+ ${t('add_customer')}`} />
+              </Card>
             ) : customers.map((c) => {
               const out = (c.total_billed || 0) - (c.total_paid || 0);
               return (
@@ -632,7 +661,6 @@ export default function Tracker() {
         {/* ── TIME LOGS ────────────────────────────────────────────── */}
         {activeTab === 'logs' && (
           <>
-            {/* In Progress section */}
             {inProgressLogs.length > 0 && (
               <>
                 <Text style={[styles.logSectionLabel, { color: '#d97706' }]}>🔄 In Progress ({inProgressLogs.length})</Text>
@@ -664,7 +692,6 @@ export default function Tracker() {
               </>
             )}
 
-            {/* Completed section */}
             {completedLogs.length > 0 && (
               <Text style={[styles.logSectionLabel, { color: theme.colors.text }]}>
                 ✅ {t('settled')} ({completedLogs.length})
@@ -672,7 +699,9 @@ export default function Tracker() {
             )}
 
             {timeLogs.length === 0 ? (
-              <Card><Text style={[styles.empty, { color: theme.colors.muted }]}>{t('no_logs_yet')}</Text></Card>
+              <Card>
+                <EmptyState emoji="📋" title={t('no_logs_yet')} actionHint={`+ ${t('add_log')}`} />
+              </Card>
             ) : (
               completedLogs.map((log) => (
                 <Card key={log.id} style={styles.itemCard}>
@@ -715,17 +744,12 @@ export default function Tracker() {
                 {editingLog ? `✏️ ${t('edit_log')}` : `⏱️ ${t('add_log')}`}
               </Text>
 
-              <Select
-                label={`${t('asset_label')} *`}
-                value={logForm.assetId}
-                onChange={handleLogAssetChange}
+              <Select label={`${t('asset_label')} *`} value={logForm.assetId} onChange={handleLogAssetChange}
                 options={assets.map((a) => ({ value: a.id, label: `${getAssetEmoji(a.asset_type)} ${a.name} (₹${a.hourly_rate}/hr)` }))}
                 placeholder={t('select_asset')}
               />
 
-              <Select
-                label={`${t('tracker_customers')} *`}
-                value={logForm.customerId}
+              <Select label={`${t('tracker_customers')} *`} value={logForm.customerId}
                 onChange={(v) => setLogForm({ ...logForm, customerId: v })}
                 options={customers.map((c) => ({ value: c.id, label: c.name }))}
                 placeholder={t('select_customer')}
@@ -735,17 +759,11 @@ export default function Tracker() {
               <View style={[styles.dtSection, { backgroundColor: isDark ? '#0f172a' : '#f8fafc', borderColor: theme.colors.border }]}>
                 <Text style={[styles.dtSectionTitle, { color: theme.colors.text }]}>🕐 {t('start_time')}</Text>
                 <View style={styles.dtRow}>
-                  <TouchableOpacity
-                    style={[styles.dtButton, { backgroundColor: isDark ? '#1e293b' : '#fff', borderColor: theme.colors.primary }]}
-                    onPress={() => setShowPicker('startDate')}
-                  >
+                  <TouchableOpacity style={[styles.dtButton, { backgroundColor: isDark ? '#1e293b' : '#fff', borderColor: theme.colors.primary }]} onPress={() => setShowPicker('startDate')}>
                     <Text style={[styles.dtButtonLabel, { color: theme.colors.muted }]}>📅 {t('date')}</Text>
                     <Text style={[styles.dtButtonValue, { color: theme.colors.text }]}>{formatDateOnly(logForm.startDate)}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.dtButton, { backgroundColor: isDark ? '#1e293b' : '#fff', borderColor: theme.colors.primary }]}
-                    onPress={() => setShowPicker('startTime')}
-                  >
+                  <TouchableOpacity style={[styles.dtButton, { backgroundColor: isDark ? '#1e293b' : '#fff', borderColor: theme.colors.primary }]} onPress={() => setShowPicker('startTime')}>
                     <Text style={[styles.dtButtonLabel, { color: theme.colors.muted }]}>🕐 {t('time')}</Text>
                     <Text style={[styles.dtButtonValue, { color: theme.colors.text }]}>{formatTimeOnly(logForm.startTime)}</Text>
                   </TouchableOpacity>
@@ -754,45 +772,30 @@ export default function Tracker() {
 
               {/* End Time Toggle */}
               <TouchableOpacity
-                style={[
-                  styles.endTimeToggle,
-                  {
-                    backgroundColor: logForm.hasEndTime
-                      ? isDark ? '#064e3b' : '#ecfdf5'
-                      : isDark ? '#334155' : '#f3f4f6',
-                    borderColor: logForm.hasEndTime
-                      ? '#059669'
-                      : theme.colors.border,
-                  },
-                ]}
+                style={[styles.endTimeToggle, {
+                  backgroundColor: logForm.hasEndTime ? isDark ? '#064e3b' : '#ecfdf5' : isDark ? '#334155' : '#f3f4f6',
+                  borderColor: logForm.hasEndTime ? '#059669' : theme.colors.border,
+                }]}
                 onPress={() => setLogForm({ ...logForm, hasEndTime: !logForm.hasEndTime })}
               >
                 <Text style={[styles.endTimeToggleText, { color: logForm.hasEndTime ? '#059669' : theme.colors.muted }]}>
                   {logForm.hasEndTime ? '✅ End Time Added' : '➕ Add End Time (optional)'}
                 </Text>
                 <Text style={[styles.endTimeToggleHint, { color: theme.colors.muted }]}>
-                  {logForm.hasEndTime
-                    ? 'Job will be marked as completed'
-                    : 'Leave empty to mark as "In Progress"'}
+                  {logForm.hasEndTime ? 'Job will be marked as completed' : 'Leave empty to mark as "In Progress"'}
                 </Text>
               </TouchableOpacity>
 
-              {/* End Date & Time (only if toggled on) */}
+              {/* End Date & Time */}
               {logForm.hasEndTime && (
                 <View style={[styles.dtSection, { backgroundColor: isDark ? '#0f172a' : '#f8fafc', borderColor: theme.colors.border }]}>
                   <Text style={[styles.dtSectionTitle, { color: theme.colors.text }]}>🏁 {t('end_time')}</Text>
                   <View style={styles.dtRow}>
-                    <TouchableOpacity
-                      style={[styles.dtButton, { backgroundColor: isDark ? '#1e293b' : '#fff', borderColor: theme.colors.primary }]}
-                      onPress={() => setShowPicker('endDate')}
-                    >
+                    <TouchableOpacity style={[styles.dtButton, { backgroundColor: isDark ? '#1e293b' : '#fff', borderColor: theme.colors.primary }]} onPress={() => setShowPicker('endDate')}>
                       <Text style={[styles.dtButtonLabel, { color: theme.colors.muted }]}>📅 {t('date')}</Text>
                       <Text style={[styles.dtButtonValue, { color: theme.colors.text }]}>{formatDateOnly(logForm.endDate)}</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.dtButton, { backgroundColor: isDark ? '#1e293b' : '#fff', borderColor: theme.colors.primary }]}
-                      onPress={() => setShowPicker('endTime')}
-                    >
+                    <TouchableOpacity style={[styles.dtButton, { backgroundColor: isDark ? '#1e293b' : '#fff', borderColor: theme.colors.primary }]} onPress={() => setShowPicker('endTime')}>
                       <Text style={[styles.dtButtonLabel, { color: theme.colors.muted }]}>🕐 {t('time')}</Text>
                       <Text style={[styles.dtButtonValue, { color: theme.colors.text }]}>{formatTimeOnly(logForm.endTime)}</Text>
                     </TouchableOpacity>
@@ -800,16 +803,8 @@ export default function Tracker() {
                 </View>
               )}
 
-              {/* Hourly Rate */}
-              <Input
-                label={`${t('hourly_rate')} *`}
-                value={logForm.hourlyRate}
-                onChangeText={(v) => setLogForm({ ...logForm, hourlyRate: v })}
-                placeholder="0"
-                keyboardType="numeric"
-              />
+              <Input label={`${t('hourly_rate')} *`} value={logForm.hourlyRate} onChangeText={(v) => setLogForm({ ...logForm, hourlyRate: v })} placeholder="0" keyboardType="numeric" />
 
-              {/* Preview */}
               {logForm.hasEndTime && logPreviewDuration > 0 && (
                 <Card style={[styles.previewCard, { backgroundColor: isDark ? '#064e3b' : '#ecfdf5' }]}>
                   <Text style={[styles.previewCardTitle, { color: '#059669' }]}>✅ {t('duration')} Preview</Text>
@@ -832,12 +827,7 @@ export default function Tracker() {
                 </View>
               )}
 
-              <Input
-                label={t('notes')}
-                value={logForm.notes}
-                onChangeText={(v) => setLogForm({ ...logForm, notes: v })}
-                placeholder={t('optional')}
-              />
+              <Input label={t('notes')} value={logForm.notes} onChangeText={(v) => setLogForm({ ...logForm, notes: v })} placeholder={t('optional')} />
 
               <View style={styles.modalButtons}>
                 <Button title={t('cancel')} variant="secondary" onPress={() => setLogModal(false)} />
@@ -927,6 +917,11 @@ export default function Tracker() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+
+  // Header stats
+  headerStats: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+
+  // Tab bar - below header
   tabBar: { flexGrow: 0, borderBottomWidth: 1 },
   tabBarContent: { paddingHorizontal: 8 },
   tabItem: { paddingHorizontal: 12, paddingVertical: 12, marginHorizontal: 4 },
@@ -964,7 +959,6 @@ const styles = StyleSheet.create({
   logAmount: { fontSize: 16, fontWeight: '800' },
   logSectionLabel: { fontSize: 14, fontWeight: '700', marginBottom: 10, marginTop: 4 },
 
-  // In progress
   inProgressBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   inProgressBadgeText: { fontSize: 11, fontWeight: '700', color: '#92400e' },
   tapToComplete: { fontSize: 11, fontWeight: '600', marginTop: 4 },
@@ -1000,7 +994,6 @@ const styles = StyleSheet.create({
   deleteBtn: { fontSize: 18, padding: 4 },
   addBtn: { marginTop: 8, marginBottom: 8 },
 
-  // Date Time
   dtSection: { borderWidth: 1, borderRadius: 12, padding: 14, marginBottom: 16 },
   dtSectionTitle: { fontSize: 14, fontWeight: '700', marginBottom: 12 },
   dtRow: { flexDirection: 'row', gap: 10 },
@@ -1008,12 +1001,10 @@ const styles = StyleSheet.create({
   dtButtonLabel: { fontSize: 11, fontWeight: '600', marginBottom: 4 },
   dtButtonValue: { fontSize: 14, fontWeight: '700' },
 
-  // End time toggle
   endTimeToggle: { borderWidth: 1.5, borderRadius: 12, padding: 16, marginBottom: 16, alignItems: 'center' },
   endTimeToggleText: { fontSize: 15, fontWeight: '700' },
   endTimeToggleHint: { fontSize: 12, marginTop: 4 },
 
-  // In progress info
   inProgressInfo: { borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 16 },
   inProgressInfoText: { fontSize: 12, lineHeight: 18 },
 
