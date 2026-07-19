@@ -49,9 +49,13 @@ export default function Signup() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.header}>
-            <Text style={styles.logo}>💰</Text>
-            <Text style={styles.title}>{t('create_account')}</Text>
-            <Text style={styles.subtitle}>{t('start_tracking')}</Text>
+            <Text style={styles.logo}>📓</Text>
+            <Text style={[styles.title, { color: theme.colors.text }]}>
+              {t('create_account')}
+            </Text>
+            <Text style={[styles.subtitle, { color: theme.colors.muted }]}>
+              {t('app_tagline')}
+            </Text>
           </View>
 
           <Card style={styles.card}>

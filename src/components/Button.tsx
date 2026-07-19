@@ -8,6 +8,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
+import { lightHaptic } from '../lib/haptics';
 
 interface ButtonProps {
   title: string;
@@ -43,7 +44,10 @@ export function Button({
   return (
     <TouchableOpacity
       activeOpacity={0.78}
-      onPress={onPress}
+      onPress={() => {
+        lightHaptic();
+        onPress();
+      }}
       disabled={isDisabled}
       style={[
         styles.button,

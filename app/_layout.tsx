@@ -23,6 +23,7 @@ export default function RootLayout() {
               <Stack.Screen name="organizer/service/[id]" />
               <Stack.Screen name="organizer/refill/[id]" />
               <Stack.Screen name="organizer/habit/[id]" />
+              <Stack.Screen name="onboarding" />
             </Stack>
           </AuthProvider>
         </AppSettingsProvider>

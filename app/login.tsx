@@ -84,7 +84,7 @@ export default function Login() {
         <ScrollView contentContainerStyle={styles.scrollContent}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.logo}>💰</Text>
+            <Text style={styles.logo}>📓</Text>
             <Text style={[styles.title, { color: theme.colors.text }]}>
               {t('app_name')}
             </Text>

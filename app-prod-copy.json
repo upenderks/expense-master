@@ -39,6 +39,13 @@
           "photosPermission": "Allow DigiDiary to access photos for receipt capture",
           "cameraPermission": "Allow DigiDiary to access camera for receipt capture"
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#2563eb"
+        }
       ]
     ]
   }

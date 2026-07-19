@@ -286,7 +286,7 @@ function generateHTML(data: ExpenseReportData): string {
         <div class="header">
           <div class="header-top">
             <div>
-              <div class="app-name">💰 Expense Master</div>
+              <div class="app-name">📓 DigiDiary</div>
               <div class="report-title">Expense Report</div>
             </div>
             <div class="header-badge">

@@ -671,6 +671,56 @@ export default function More() {
         </Card>
       )}
 
+       {/* About Card */}
+      <Card style={[
+        styles.aboutCard,
+        { backgroundColor: isDark ? theme.colors.surface : '#f8fafc', borderColor: theme.colors.border },
+      ]}>
+        <View style={styles.aboutHeader}>
+          <Text style={styles.aboutLogo}>📓</Text>
+          <View>
+            <Text style={[styles.aboutAppName, { color: theme.colors.text }]}>
+              DigiDiary
+            </Text>
+            <Text style={[styles.aboutVersion, { color: theme.colors.muted }]}>
+              Version 1.0.0
+            </Text>
+          </View>
+        </View>
+        <Text style={[styles.aboutTagline, { color: theme.colors.muted }]}>
+          {t('app_tagline')}
+        </Text>
+
+        <View style={[styles.aboutDivider, { backgroundColor: theme.colors.border }]} />
+
+        <View style={styles.aboutFeatures}>
+          {[
+            { emoji: '💰', label: t('tab_money') },
+            { emoji: '💸', label: t('tab_expenses') },
+            { emoji: '⏱️', label: t('tab_tracker') },
+            { emoji: '📒', label: t('tab_organizer') },
+            { emoji: '🌙', label: t('appearance') },
+            { emoji: '🌐', label: t('language') },
+          ].map((item, i) => (
+            <View key={i} style={styles.aboutFeatureItem}>
+              <Text style={styles.aboutFeatureEmoji}>{item.emoji}</Text>
+              <Text style={[styles.aboutFeatureLabel, { color: theme.colors.text }]}>
+                {item.label}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        <View style={[styles.aboutDivider, { backgroundColor: theme.colors.border }]} />
+
+        <Text style={[styles.aboutFooter, { color: theme.colors.muted }]}>
+          Made with ❤️ in India
+        </Text>
+        <Text style={[styles.aboutCopyright, { color: theme.colors.muted }]}>
+          © 2026 DigiDiary. All rights reserved.
+        </Text>
+      </Card>
+
       {/* Logout */}
       <Card style={styles.logoutCard}>
         <Button title={t('logout')} variant="danger" onPress={handleLogout} />
@@ -928,4 +978,19 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 18, fontWeight: '600', marginBottom: 12 },
   filterOption: { padding: 14, borderRadius: 8, marginVertical: 2 },
   filterOptionText: { fontSize: 16 },
+
+    // About
+  aboutCard: { marginBottom: 16, borderWidth: 1, alignItems: 'center' },
+  aboutHeader: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 8 },
+  aboutLogo: { fontSize: 42 },
+  aboutAppName: { fontSize: 22, fontWeight: '800' },
+  aboutVersion: { fontSize: 13, marginTop: 2 },
+  aboutTagline: { fontSize: 14, textAlign: 'center', marginBottom: 16 },
+  aboutDivider: { height: 1, alignSelf: 'stretch', marginVertical: 14 },
+  aboutFeatures: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12 },
+  aboutFeatureItem: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.03)' },
+  aboutFeatureEmoji: { fontSize: 14 },
+  aboutFeatureLabel: { fontSize: 12, fontWeight: '500' },
+  aboutFooter: { fontSize: 13, marginTop: 4 },
+  aboutCopyright: { fontSize: 11, marginTop: 4 },
 });

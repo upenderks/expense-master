@@ -4,8 +4,8 @@ export type TranslationKey = keyof typeof en;
 
 const en = {
   // ── App ────────────────────────────────────
-  app_name: 'Money & Expense',
-  app_tagline: 'Track your finances offline',
+  app_name: 'DigiDiary',
+  app_tagline: 'Your complete digital diary',
 
   // ── Common ─────────────────────────────────
   save: 'Save',
@@ -541,8 +541,8 @@ const en = {
 
 const hi: typeof en = {
   // ── App ────────────────────────────────────
-  app_name: 'मनी और खर्च',
-  app_tagline: 'अपने वित्त को ऑफ़लाइन ट्रैक करें',
+  app_name: 'डिजीडायरी',
+  app_tagline: 'आपकी सम्पूर्ण डिजिटल डायरी',
 
   // ── Common ─────────────────────────────────
   save: 'सेव करें',
