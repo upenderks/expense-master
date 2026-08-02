@@ -158,7 +158,7 @@ export default function Login() {
           </View>
 
           {/* Features */}
-          <View style={styles.featuresRow}>
+          {/* <View style={styles.featuresRow}>
             {[
               { emoji: '🔒', label: 'Offline' },
               { emoji: '🌙', label: 'Dark Mode' },
@@ -174,7 +174,7 @@ export default function Login() {
                 </Text>
               </View>
             ))}
-          </View>
+          </View> */}
 
           {/* Admin */}
           <TouchableOpacity
@@ -218,7 +218,7 @@ export default function Login() {
               label={t('admin_email')}
               value={adminEmail}
               onChangeText={setAdminEmail}
-              placeholder="admin@app.local"
+              placeholder="enter email"
               keyboardType="email-address"
               autoCapitalize="none"
             />

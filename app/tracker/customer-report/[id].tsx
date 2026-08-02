@@ -234,6 +234,7 @@ export default function CustomerReport() {
       const jobRows = jobs.map((job: any, i: number) => `
         <tr style="background:${i % 2 === 0 ? '#f9fafb' : '#fff'}">
           <td style="padding:8px 12px;font-size:13px;">${formatDateTime(job.start_time)}</td>
+          <td style="padding:8px 12px;font-size:13px;">${formatDateTime(job.end_time)}</td>
           <td style="padding:8px 12px;font-size:13px;">${job.asset_name}</td>
           <td style="padding:8px 12px;font-size:13px;text-align:center;">${formatDuration(job.duration_minutes)}</td>
           <td style="padding:8px 12px;font-size:13px;text-align:right;">₹${job.hourly_rate}/hr</td>
@@ -282,13 +283,15 @@ export default function CustomerReport() {
             <div class="section-title">📋 ${t('job_history')} (${totalJobs})</div>
             ${jobs.length === 0 ? `<p style="text-align:center;color:#9ca3af;padding:20px;">${t('no_jobs_period')}</p>` :
               `<table><thead><tr>
-                <th>${t('date')}</th><th>${t('asset_label')}</th>
+                <th>${t('start_time')}</th>
+                <th>${t('end_time')}</th>
+                <th>${t('asset_label')}</th>
                 <th style="text-align:center;">${t('duration')}</th>
                 <th style="text-align:right;">${t('rate')}</th>
                 <th style="text-align:right;">${t('amount')}</th>
               </tr></thead><tbody>${jobRows}</tbody>
               <tfoot><tr>
-                <td colspan="4" style="padding:10px 12px;font-weight:700;text-align:right;">${t('total')}</td>
+                <td colspan="5" style="padding:10px 12px;font-weight:700;text-align:right;">${t('total')}</td>
                 <td style="padding:10px 12px;text-align:right;font-weight:800;color:#059669;">${formatCurrency(totalAmount)}</td>
               </tr></tfoot></table>`}
           </div>
@@ -303,7 +306,7 @@ export default function CustomerReport() {
                 <td></td>
               </tr></tfoot></table>`}
           </div>
-          <div class="footer">Asset Tracker • ${generatedOn}</div>
+          <div class="footer">DigiDiary Asset Tracker • ${generatedOn}</div>
         </div></body></html>
       `;
 

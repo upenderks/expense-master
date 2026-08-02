@@ -21,7 +21,7 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
 
   openPromise = (async () => {
     try {
-      const database = await SQLite.openDatabaseAsync('expense_tracker.db');
+      const database = await SQLite.openDatabaseAsync('digidiary.db');
       await initializeDatabase(database);
       db = database;
       return database;
@@ -66,16 +66,6 @@ export function resetDatabaseInstance(): void {
 
 async function initializeDatabase(database: SQLite.SQLiteDatabase): Promise<void> {
   await database.execAsync('PRAGMA foreign_keys = OFF;');
-
-  /*
-  await database.execAsync(`
-    DROP TABLE IF EXISTS expenses;
-    DROP TABLE IF EXISTS money_transactions;
-    DROP TABLE IF EXISTS expense_categories;
-    DROP TABLE IF EXISTS borrowers;
-    DROP TABLE IF EXISTS users;
-  `);
-  */
 
   await database.execAsync('PRAGMA foreign_keys = ON;');
 
@@ -176,6 +166,22 @@ async function initializeDatabase(database: SQLite.SQLiteDatabase): Promise<void
   // Asset tracking tables must run AFTER core tables
   await initAssetTrackingTables(database);
 
+  // ── One-time data fix migration ────────────────────────────────────────────
+  // Fix records that have no end_time but status = 'completed' (wrong DB default)
+  // Fix records that have end_time but status = 'running' (inconsistency)
+  await database.execAsync(`
+    UPDATE time_logs
+    SET status = 'running'
+    WHERE (end_time IS NULL OR end_time = '')
+    AND status = 'completed';
+
+    UPDATE time_logs
+    SET status = 'completed'
+    WHERE end_time IS NOT NULL
+    AND end_time != ''
+    AND status = 'running';
+  `);
+
   // Initialize organizer tables
   await database.execAsync(`
     CREATE TABLE IF NOT EXISTS home_services (
@@ -245,7 +251,7 @@ async function initializeDatabase(database: SQLite.SQLiteDatabase): Promise<void
     );
   `);
 
-      // Habits tables
+  // Habits tables
   await database.execAsync(`
     CREATE TABLE IF NOT EXISTS habits (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -325,7 +331,7 @@ async function initAssetTrackingTables(
       hourly_rate REAL NOT NULL DEFAULT 0,
       total_amount REAL DEFAULT 0,
       notes TEXT,
-      status TEXT DEFAULT 'completed',
+      status TEXT DEFAULT 'running',
       is_settled INTEGER DEFAULT 0,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -384,12 +390,12 @@ export async function createUser(
   );
   const userId = result.lastInsertRowId;
   const defaultCategories = [
-    { name: 'Food', color: '#ef4444' },
-    { name: 'Transport', color: '#f59e0b' },
-    { name: 'Shopping', color: '#8b5cf6' },
-    { name: 'Bills', color: '#10b981' },
+    { name: 'Food',          color: '#ef4444' },
+    { name: 'Transport',     color: '#f59e0b' },
+    { name: 'Shopping',      color: '#8b5cf6' },
+    { name: 'Bills',         color: '#10b981' },
     { name: 'Entertainment', color: '#3b82f6' },
-    { name: 'Others', color: '#6b7280' },
+    { name: 'Others',        color: '#6b7280' },
   ];
   for (const cat of defaultCategories) {
     await db.runAsync(
@@ -461,7 +467,10 @@ export async function updateBorrower(
 
 export async function deleteBorrower(id: number, userId: number): Promise<void> {
   const db = await getDatabase();
-  await db.runAsync('DELETE FROM borrowers WHERE id = ? AND user_id = ?', [id, userId]);
+  await db.runAsync(
+    'DELETE FROM borrowers WHERE id = ? AND user_id = ?',
+    [id, userId]
+  );
 }
 
 // ==================== MONEY TRANSACTIONS ====================
@@ -536,9 +545,11 @@ export async function getTransactionById(id: number, userId: number): Promise<an
 
 export async function deleteTransaction(id: number, userId: number): Promise<void> {
   const db = await getDatabase();
-  await db.runAsync('DELETE FROM money_transactions WHERE id = ? AND user_id = ?', [id, userId]);
+  await db.runAsync(
+    'DELETE FROM money_transactions WHERE id = ? AND user_id = ?',
+    [id, userId]
+  );
 }
-
 
 // ==================== EXPENSE CATEGORIES ====================
 
@@ -571,7 +582,9 @@ export async function updateExpenseCategory(
   );
 }
 
-export async function deleteExpenseCategory(id: number, userId: number): Promise<void> {
+export async function deleteExpenseCategory(
+  id: number, userId: number
+): Promise<void> {
   const db = await getDatabase();
   await db.runAsync(
     'DELETE FROM expense_categories WHERE id = ? AND user_id = ?',
@@ -643,7 +656,10 @@ export async function getExpenseById(id: number, userId: number): Promise<any> {
 
 export async function deleteExpense(id: number, userId: number): Promise<void> {
   const db = await getDatabase();
-  await db.runAsync('DELETE FROM expenses WHERE id = ? AND user_id = ?', [id, userId]);
+  await db.runAsync(
+    'DELETE FROM expenses WHERE id = ? AND user_id = ?',
+    [id, userId]
+  );
 }
 
 // ==================== MONEY SETTLEMENTS ====================
@@ -659,13 +675,14 @@ export async function settleBorrower(
   );
   if (unsettled.length === 0) throw new Error('No unsettled transactions to settle');
 
-  const totalGiven = unsettled.filter((t) => t.type === 'given').reduce((s, t) => s + t.amount, 0);
+  const totalGiven    = unsettled.filter((t) => t.type === 'given').reduce((s, t) => s + t.amount, 0);
   const totalReceived = unsettled.filter((t) => t.type === 'received').reduce((s, t) => s + t.amount, 0);
-  const balance = totalGiven - totalReceived;
-  const settledAt = new Date().toISOString();
+  const balance       = totalGiven - totalReceived;
+  const settledAt     = new Date().toISOString();
 
   const result = await db.runAsync(
-    `INSERT INTO settlements (user_id, borrower_id, total_given, total_received, balance, transaction_count, notes, settled_at)
+    `INSERT INTO settlements
+     (user_id, borrower_id, total_given, total_received, balance, transaction_count, notes, settled_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [userId, borrowerId, totalGiven, totalReceived, balance, unsettled.length, notes || null, settledAt]
   );
@@ -736,17 +753,19 @@ export async function getMoneyDashboardData(
   filters?: { startDate?: string; endDate?: string }
 ): Promise<any> {
   const db = await getDatabase();
-  let dateFilter = '';
+  let dateFilter    = '';
   const params: any[] = [userId];
   if (filters?.startDate) { dateFilter += ' AND date >= ?'; params.push(filters.startDate); }
-  if (filters?.endDate) { dateFilter += ' AND date <= ?'; params.push(filters.endDate); }
+  if (filters?.endDate)   { dateFilter += ' AND date <= ?'; params.push(filters.endDate); }
 
   const totalGiven = await db.getFirstAsync<{ total: number }>(
-    `SELECT COALESCE(SUM(amount), 0) as total FROM money_transactions WHERE user_id = ? AND type = 'given' AND is_settled = 0${dateFilter}`,
+    `SELECT COALESCE(SUM(amount), 0) as total FROM money_transactions
+     WHERE user_id = ? AND type = 'given' AND is_settled = 0${dateFilter}`,
     params
   );
   const totalReceived = await db.getFirstAsync<{ total: number }>(
-    `SELECT COALESCE(SUM(amount), 0) as total FROM money_transactions WHERE user_id = ? AND type = 'received' AND is_settled = 0${dateFilter}`,
+    `SELECT COALESCE(SUM(amount), 0) as total FROM money_transactions
+     WHERE user_id = ? AND type = 'received' AND is_settled = 0${dateFilter}`,
     params
   );
   const borrowerCount = await db.getFirstAsync<{ count: number }>(
@@ -772,13 +791,13 @@ export async function getMoneyDashboardData(
     [userId]
   );
 
-  const totalGivenAmount = totalGiven?.total || 0;
+  const totalGivenAmount    = totalGiven?.total    || 0;
   const totalReceivedAmount = totalReceived?.total || 0;
   return {
-    totalGiven: totalGivenAmount,
-    totalReceived: totalReceivedAmount,
-    outstanding: totalGivenAmount - totalReceivedAmount,
-    borrowerCount: borrowerCount?.count || 0,
+    totalGiven:       totalGivenAmount,
+    totalReceived:    totalReceivedAmount,
+    outstanding:      totalGivenAmount - totalReceivedAmount,
+    borrowerCount:    borrowerCount?.count || 0,
     borrowerBalances,
     recentTransactions,
   };
@@ -829,7 +848,7 @@ export async function getExpenseDashboardData(
   return {
     period,
     startDate,
-    totalExpenses: totalExpenses?.total || 0,
+    totalExpenses:  totalExpenses?.total || 0,
     categoryTotals,
     recentExpenses,
   };
@@ -846,9 +865,8 @@ async function ensureDefaultAdmin(database: SQLite.SQLiteDatabase): Promise<void
       const defaultPassword = hashPasswordSimple('admin123');
       await database.runAsync(
         'INSERT OR IGNORE INTO users (name, email, password, is_admin) VALUES (?, ?, ?, 1)',
-        ['Admin', 'admin@digidiary.local', defaultPassword]
+        ['Admin', 'admin@digidiary.com', defaultPassword]
       );
-      //console.log('✅ Default admin created (admin@digidiary.local / admin123)');
     }
   } catch (e) {
     console.error('Admin creation error:', e);
@@ -859,8 +877,8 @@ function hashPasswordSimple(password: string): string {
   let hash = 0;
   for (let i = 0; i < password.length; i++) {
     const char = password.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
+    hash       = ((hash << 5) - hash) + char;
+    hash       = hash & hash;
   }
   return `hash_${Math.abs(hash)}_${password.length}`;
 }
@@ -899,7 +917,9 @@ export async function getAllAppSettings(): Promise<Record<string, string>> {
 
 // ==================== USER SETTINGS ====================
 
-export async function getUserSetting(userId: number, key: string): Promise<string | null> {
+export async function getUserSetting(
+  userId: number, key: string
+): Promise<string | null> {
   return safeExecute(async (db) => {
     const result = await db.getFirstAsync<{ setting_value: string }>(
       'SELECT setting_value FROM user_settings WHERE user_id = ? AND setting_key = ?',
@@ -909,16 +929,21 @@ export async function getUserSetting(userId: number, key: string): Promise<strin
   });
 }
 
-export async function setUserSetting(userId: number, key: string, value: string): Promise<void> {
+export async function setUserSetting(
+  userId: number, key: string, value: string
+): Promise<void> {
   return safeExecute(async (db) => {
     await db.runAsync(
-      `INSERT OR REPLACE INTO user_settings (user_id, setting_key, setting_value, updated_at) VALUES (?, ?, ?, datetime('now'))`,
+      `INSERT OR REPLACE INTO user_settings
+       (user_id, setting_key, setting_value, updated_at) VALUES (?, ?, ?, datetime('now'))`,
       [userId, key, value]
     );
   });
 }
 
-export async function getAllUserSettings(userId: number): Promise<Record<string, string>> {
+export async function getAllUserSettings(
+  userId: number
+): Promise<Record<string, string>> {
   return safeExecute(async (db) => {
     const rows = await db.getAllAsync<{ setting_key: string; setting_value: string }>(
       'SELECT setting_key, setting_value FROM user_settings WHERE user_id = ?',
@@ -949,7 +974,10 @@ export async function getAllUsers(): Promise<any[]> {
 
 export async function updateUserStatus(userId: number, isActive: boolean): Promise<void> {
   return safeExecute(async (db) => {
-    await db.runAsync('UPDATE users SET is_active = ? WHERE id = ?', [isActive ? 1 : 0, userId]);
+    await db.runAsync(
+      'UPDATE users SET is_active = ? WHERE id = ?',
+      [isActive ? 1 : 0, userId]
+    );
   });
 }
 
@@ -988,8 +1016,12 @@ export async function changeAdminPassword(
       'SELECT password FROM users WHERE id = ? AND is_admin = 1', [adminId]
     );
     if (!admin) throw new Error('Admin not found');
-    if (admin.password !== hashPasswordSimple(currentPassword)) throw new Error('Current password is incorrect');
-    await db.runAsync('UPDATE users SET password = ? WHERE id = ?', [hashPasswordSimple(newPassword), adminId]);
+    if (admin.password !== hashPasswordSimple(currentPassword))
+      throw new Error('Current password is incorrect');
+    await db.runAsync(
+      'UPDATE users SET password = ? WHERE id = ?',
+      [hashPasswordSimple(newPassword), adminId]
+    );
   });
 }
 
@@ -1002,7 +1034,9 @@ export async function getUserStats(userId: number): Promise<any> {
     const borrowers = await db.getFirstAsync<{ count: number }>(
       'SELECT COUNT(*) as count FROM borrowers WHERE user_id = ?', [userId]
     );
-    const transactions = await db.getFirstAsync<{ count: number; given: number; received: number }>(
+    const transactions = await db.getFirstAsync<{
+      count: number; given: number; received: number;
+    }>(
       `SELECT COUNT(*) as count,
         COALESCE(SUM(CASE WHEN type = 'given' THEN amount ELSE 0 END), 0) as given,
         COALESCE(SUM(CASE WHEN type = 'received' THEN amount ELSE 0 END), 0) as received
@@ -1010,12 +1044,12 @@ export async function getUserStats(userId: number): Promise<any> {
       [userId]
     );
     return {
-      expenseCount: expenses?.count || 0,
-      totalExpenses: expenses?.total || 0,
-      borrowerCount: borrowers?.count || 0,
-      transactionCount: transactions?.count || 0,
-      totalGiven: transactions?.given || 0,
-      totalReceived: transactions?.received || 0,
+      expenseCount:     expenses?.count    || 0,
+      totalExpenses:    expenses?.total    || 0,
+      borrowerCount:    borrowers?.count   || 0,
+      transactionCount: transactions?.count    || 0,
+      totalGiven:       transactions?.given    || 0,
+      totalReceived:    transactions?.received || 0,
     };
   });
 }
@@ -1026,8 +1060,14 @@ export async function getAssets(userId: number): Promise<any[]> {
   return safeExecute((db) =>
     db.getAllAsync(
       `SELECT a.*,
-        COALESCE((SELECT SUM(duration_minutes) FROM time_logs WHERE asset_id = a.id AND user_id = ?), 0) as total_minutes,
-        COALESCE((SELECT SUM(total_amount) FROM time_logs WHERE asset_id = a.id AND user_id = ?), 0) as total_earned
+        COALESCE((
+          SELECT SUM(duration_minutes) FROM time_logs
+          WHERE asset_id = a.id AND user_id = ?
+        ), 0) as total_minutes,
+        COALESCE((
+          SELECT SUM(total_amount) FROM time_logs
+          WHERE asset_id = a.id AND user_id = ?
+        ), 0) as total_earned
        FROM assets a
        WHERE a.user_id = ?
        ORDER BY a.name ASC`,
@@ -1057,8 +1097,11 @@ export async function updateAsset(
     await db.runAsync(
       `UPDATE assets SET name = ?, asset_type = ?, hourly_rate = ?,
        description = ?, is_active = ? WHERE id = ? AND user_id = ?`,
-      [name, assetType, hourlyRate, description || null,
-       isActive !== undefined ? (isActive ? 1 : 0) : 1, id, userId]
+      [
+        name, assetType, hourlyRate, description || null,
+        isActive !== undefined ? (isActive ? 1 : 0) : 1,
+        id, userId,
+      ]
     );
     return undefined;
   });
@@ -1073,20 +1116,35 @@ export async function deleteAsset(id: number, userId: number): Promise<void> {
 
 // ── Asset Customers ────────────────────────────────────────────────────────
 
-export async function getAssetCustomers(userId: number): Promise<any[]> {
-  return safeExecute((db) =>
-    db.getAllAsync(
-      `SELECT c.*,
-        COALESCE((SELECT SUM(total_amount) FROM time_logs
-          WHERE customer_id = c.id AND user_id = ? AND is_settled = 0 AND status = 'completed'), 0) as total_billed,
-        COALESCE((SELECT SUM(amount) FROM asset_payments
-          WHERE customer_id = c.id AND user_id = ? AND is_settled = 0), 0) as total_paid
+export async function getAssetCustomers(
+  userId: number, searchText?: string
+): Promise<any[]> {
+  return safeExecute((db) => {
+    let query = `
+      SELECT c.*,
+        COALESCE((
+          SELECT SUM(total_amount) FROM time_logs
+          WHERE customer_id = c.id AND user_id = ?
+          AND is_settled = 0 AND status = 'completed'
+        ), 0) as total_billed,
+        COALESCE((
+          SELECT SUM(amount) FROM asset_payments
+          WHERE customer_id = c.id AND user_id = ? AND is_settled = 0
+        ), 0) as total_paid
        FROM asset_customers c
        WHERE c.user_id = ?
-       ORDER BY c.name ASC`,
-      [userId, userId, userId]
-    )
-  );
+    `;
+    const params: any[] = [userId, userId, userId];
+
+    if (searchText) {
+      query += ' AND (c.name LIKE ? OR c.phone LIKE ?)';
+      const search = `%${searchText}%`;
+      params.push(search, search);
+    }
+
+    query += ' ORDER BY c.name ASC';
+    return db.getAllAsync(query, params);
+  });
 }
 
 export async function createAssetCustomer(
@@ -1116,7 +1174,10 @@ export async function updateAssetCustomer(
 
 export async function deleteAssetCustomer(id: number, userId: number): Promise<void> {
   return safeExecute(async (db) => {
-    await db.runAsync('DELETE FROM asset_customers WHERE id = ? AND user_id = ?', [id, userId]);
+    await db.runAsync(
+      'DELETE FROM asset_customers WHERE id = ? AND user_id = ?',
+      [id, userId]
+    );
   });
 }
 
@@ -1125,10 +1186,11 @@ export async function deleteAssetCustomer(id: number, userId: number): Promise<v
 export async function getTimeLogs(
   userId: number,
   filters?: {
-    customerId?: number;
-    assetId?: number;
+    customerId?: number | string;
+    assetId?: number | string;
     startDate?: string;
     endDate?: string;
+    searchText?: string;
   }
 ): Promise<any[]> {
   return safeExecute(async (db) => {
@@ -1140,13 +1202,34 @@ export async function getTimeLogs(
       LEFT JOIN assets a ON tl.asset_id = a.id
       LEFT JOIN asset_customers c ON tl.customer_id = c.id
       WHERE tl.user_id = ?
+      AND tl.is_settled = 0
     `;
+    // ☝️ is_settled = 0 ensures already settled/paid records
+    // are excluded from the active Time Logs list
+
     const params: any[] = [userId];
 
-    if (filters?.customerId) { query += ' AND tl.customer_id = ?'; params.push(filters.customerId); }
-    if (filters?.assetId) { query += ' AND tl.asset_id = ?'; params.push(filters.assetId); }
-    if (filters?.startDate) { query += ' AND DATE(tl.start_time) >= ?'; params.push(filters.startDate); }
-    if (filters?.endDate) { query += ' AND DATE(tl.start_time) <= ?'; params.push(filters.endDate); }
+    if (filters?.customerId) {
+      query += ' AND tl.customer_id = ?';
+      params.push(filters.customerId);
+    }
+    if (filters?.assetId) {
+      query += ' AND tl.asset_id = ?';
+      params.push(filters.assetId);
+    }
+    if (filters?.startDate) {
+      query += ' AND DATE(tl.start_time) >= ?';
+      params.push(filters.startDate);
+    }
+    if (filters?.endDate) {
+      query += ' AND DATE(tl.start_time) <= ?';
+      params.push(filters.endDate);
+    }
+    if (filters?.searchText) {
+      query += ' AND (a.name LIKE ? OR c.name LIKE ? OR tl.notes LIKE ?)';
+      const search = `%${filters.searchText}%`;
+      params.push(search, search, search);
+    }
 
     query += ' ORDER BY tl.start_time DESC';
     return db.getAllAsync(query, params);
@@ -1159,15 +1242,19 @@ export async function createTimeLog(
   hourlyRate: number, totalAmount: number, notes?: string
 ): Promise<number> {
   return safeExecute(async (db) => {
+    // Determine status based on whether end time is provided
     const status = endTime ? 'completed' : 'running';
     const result = await db.runAsync(
       `INSERT INTO time_logs
        (user_id, asset_id, customer_id, start_time, end_time,
         duration_minutes, hourly_rate, total_amount, notes, status)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [userId, assetId, customerId, startTime,
-       endTime || null, durationMinutes, hourlyRate,
-       totalAmount, notes || null, status]
+      [
+        userId, assetId, customerId, startTime,
+        endTime || null,      // ← store NULL not empty string
+        durationMinutes, hourlyRate,
+        totalAmount, notes || null, status,
+      ]
     );
     return result.lastInsertRowId;
   });
@@ -1179,21 +1266,31 @@ export async function updateTimeLog(
   hourlyRate: number, totalAmount: number, notes?: string
 ): Promise<void> {
   return safeExecute(async (db) => {
+    // Determine status based on whether end time is provided
     const status = endTime ? 'completed' : 'running';
     await db.runAsync(
-      `UPDATE time_logs SET asset_id = ?, customer_id = ?, start_time = ?,
-       end_time = ?, duration_minutes = ?, hourly_rate = ?,
-       total_amount = ?, notes = ?, status = ? WHERE id = ? AND user_id = ?`,
-      [assetId, customerId, startTime, endTime || null,
-       durationMinutes, hourlyRate, totalAmount, notes || null,
-       status, id, userId]
+      `UPDATE time_logs
+       SET asset_id = ?, customer_id = ?, start_time = ?,
+           end_time = ?, duration_minutes = ?, hourly_rate = ?,
+           total_amount = ?, notes = ?, status = ?
+       WHERE id = ? AND user_id = ?`,
+      [
+        assetId, customerId, startTime,
+        endTime || null,      // ← store NULL not empty string
+        durationMinutes, hourlyRate,
+        totalAmount, notes || null,
+        status, id, userId,
+      ]
     );
   });
 }
 
 export async function deleteTimeLog(id: number, userId: number): Promise<void> {
   return safeExecute(async (db) => {
-    await db.runAsync('DELETE FROM time_logs WHERE id = ? AND user_id = ?', [id, userId]);
+    await db.runAsync(
+      'DELETE FROM time_logs WHERE id = ? AND user_id = ?',
+      [id, userId]
+    );
   });
 }
 
@@ -1210,7 +1307,10 @@ export async function getAssetPayments(
       WHERE p.user_id = ?
     `;
     const params: any[] = [userId];
-    if (customerId) { query += ' AND p.customer_id = ?'; params.push(customerId); }
+    if (customerId) {
+      query += ' AND p.customer_id = ?';
+      params.push(customerId);
+    }
     query += ' ORDER BY p.payment_date DESC';
     return db.getAllAsync(query, params);
   });
@@ -1231,7 +1331,10 @@ export async function createAssetPayment(
 
 export async function deleteAssetPayment(id: number, userId: number): Promise<void> {
   return safeExecute(async (db) => {
-    await db.runAsync('DELETE FROM asset_payments WHERE id = ? AND user_id = ?', [id, userId]);
+    await db.runAsync(
+      'DELETE FROM asset_payments WHERE id = ? AND user_id = ?',
+      [id, userId]
+    );
   });
 }
 
@@ -1247,18 +1350,25 @@ export async function getCustomerReportData(
       [customerId, userId]
     );
 
-    let dateFilter = '';
+    let dateFilter      = '';
     const params: any[] = [userId, customerId];
-    if (filters?.startDate) { dateFilter += ' AND DATE(start_time) >= ?'; params.push(filters.startDate); }
-    if (filters?.endDate) { dateFilter += ' AND DATE(start_time) <= ?'; params.push(filters.endDate); }
+    if (filters?.startDate) {
+      dateFilter += ' AND DATE(start_time) >= ?';
+      params.push(filters.startDate);
+    }
+    if (filters?.endDate) {
+      dateFilter += ' AND DATE(start_time) <= ?';
+      params.push(filters.endDate);
+    }
 
-    // Only unsettled jobs
+    // Only unsettled completed jobs
     const jobs = await db.getAllAsync(
       `SELECT tl.*, a.name as asset_name, a.asset_type
        FROM time_logs tl
        LEFT JOIN assets a ON tl.asset_id = a.id
        WHERE tl.user_id = ? AND tl.customer_id = ?
-       AND tl.is_settled = 0${dateFilter}
+       AND tl.is_settled = 0 AND tl.status = 'completed'
+       ${dateFilter}
        ORDER BY tl.start_time DESC`,
       params
     );
@@ -1271,7 +1381,8 @@ export async function getCustomerReportData(
         COALESCE(SUM(total_amount), 0) as total_amount
        FROM time_logs
        WHERE user_id = ? AND customer_id = ?
-       AND is_settled = 0${dateFilter}`,
+       AND is_settled = 0 AND status = 'completed'
+       ${dateFilter}`,
       params
     );
 
@@ -1283,7 +1394,9 @@ export async function getCustomerReportData(
       [userId, customerId]
     );
 
-    const totalPaid = payments.reduce((s: number, p: any) => s + Number(p.amount || 0), 0);
+    const totalPaid = payments.reduce(
+      (s: number, p: any) => s + Number(p.amount || 0), 0
+    );
 
     // Settlement history
     const settlements = await db.getAllAsync(
@@ -1298,12 +1411,12 @@ export async function getCustomerReportData(
       jobs,
       payments,
       settlements,
-      totalJobs: totals?.total_jobs || 0,
+      totalJobs:    totals?.total_jobs    || 0,
       totalMinutes: totals?.total_minutes || 0,
-      totalHours: (totals?.total_minutes || 0) / 60,
-      totalAmount: totals?.total_amount || 0,
+      totalHours:   (totals?.total_minutes || 0) / 60,
+      totalAmount:  totals?.total_amount  || 0,
       totalPaid,
-      outstanding: (totals?.total_amount || 0) - totalPaid,
+      outstanding:  (totals?.total_amount || 0) - totalPaid,
     };
   });
 }
@@ -1313,10 +1426,12 @@ export async function getCustomerReportData(
 export async function getAssetDashboardData(userId: number): Promise<any> {
   return safeExecute(async (db) => {
     const totalAssets = await db.getFirstAsync<{ count: number }>(
-      'SELECT COUNT(*) as count FROM assets WHERE user_id = ? AND is_active = 1', [userId]
+      'SELECT COUNT(*) as count FROM assets WHERE user_id = ? AND is_active = 1',
+      [userId]
     );
     const totalCustomers = await db.getFirstAsync<{ count: number }>(
-      'SELECT COUNT(*) as count FROM asset_customers WHERE user_id = ?', [userId]
+      'SELECT COUNT(*) as count FROM asset_customers WHERE user_id = ?',
+      [userId]
     );
     const totalRevenue = await db.getFirstAsync<{ total: number }>(
       `SELECT COALESCE(SUM(total_amount), 0) as total FROM time_logs
@@ -1337,47 +1452,37 @@ export async function getAssetDashboardData(userId: number): Promise<any> {
        ORDER BY tl.start_time DESC LIMIT 5`,
       [userId]
     );
-  
     const topCustomers = await db.getAllAsync(
-    `SELECT c.id, c.name,
-      COALESCE((
-        SELECT SUM(total_amount)
-        FROM time_logs
-        WHERE customer_id = c.id
-          AND user_id = ?
-          AND is_settled = 0
-          AND status = 'completed'
-      ), 0) as total_billed,
-      COALESCE((
-        SELECT SUM(amount)
-        FROM asset_payments
-        WHERE customer_id = c.id
-          AND user_id = ?
-          AND is_settled = 0
-      ), 0) as total_paid
-    FROM asset_customers c
-    WHERE c.user_id = ?
-      AND (
-        SELECT COALESCE(SUM(total_amount), 0)
-        FROM time_logs
-        WHERE customer_id = c.id
-          AND user_id = ?
-          AND is_settled = 0
-          AND status = 'completed'
-      ) > 0
-    ORDER BY total_billed DESC
-    LIMIT 5`,
-    [userId, userId, userId, userId]
-  );
+      `SELECT c.id, c.name,
+        COALESCE((
+          SELECT SUM(total_amount) FROM time_logs
+          WHERE customer_id = c.id AND user_id = ?
+          AND is_settled = 0 AND status = 'completed'
+        ), 0) as total_billed,
+        COALESCE((
+          SELECT SUM(amount) FROM asset_payments
+          WHERE customer_id = c.id AND user_id = ? AND is_settled = 0
+        ), 0) as total_paid
+       FROM asset_customers c
+       WHERE c.user_id = ?
+       AND (
+         SELECT COALESCE(SUM(total_amount), 0) FROM time_logs
+         WHERE customer_id = c.id AND user_id = ?
+         AND is_settled = 0 AND status = 'completed'
+       ) > 0
+       ORDER BY total_billed DESC
+       LIMIT 5`,
+      [userId, userId, userId, userId]
+    );
 
-    const totalRevAmount = totalRevenue?.total || 0;
-    const totalPaidAmount = totalPaid?.total || 0;
+    const totalRevAmount  = totalRevenue?.total || 0;
+    const totalPaidAmount = totalPaid?.total    || 0;
     return {
-      totalAssets: totalAssets?.count || 0,
+      totalAssets:    totalAssets?.count    || 0,
       totalCustomers: totalCustomers?.count || 0,
-      totalRevenue: totalRevAmount,
-      totalPaid: totalPaidAmount,
-      outstanding: totalRevAmount - totalPaidAmount,
+      totalRevenue:   totalRevAmount,
+      totalPaid:      totalPaidAmount,
+      outstanding:    totalRevAmount - totalPaidAmount,
       recentLogs,
       topCustomers,
     };
@@ -1392,10 +1497,12 @@ export async function settleAssetCustomer(
   return safeExecute(async (db) => {
     const unsettledJobs = await db.getAllAsync<{ id: number; total_amount: number }>(
       `SELECT id, total_amount FROM time_logs
-       WHERE user_id = ? AND customer_id = ? AND status = 'completed' AND is_settled = 0`,
+       WHERE user_id = ? AND customer_id = ?
+       AND status = 'completed' AND is_settled = 0`,
       [userId, customerId]
     );
-    if (unsettledJobs.length === 0) throw new Error('No unsettled completed jobs to settle');
+    if (unsettledJobs.length === 0)
+      throw new Error('No unsettled completed jobs to settle');
 
     const unsettledPayments = await db.getAllAsync<{ id: number; amount: number }>(
       `SELECT id, amount FROM asset_payments
@@ -1404,15 +1511,18 @@ export async function settleAssetCustomer(
     );
 
     const totalBilled = unsettledJobs.reduce((s, j) => s + j.total_amount, 0);
-    const totalPaid = unsettledPayments.reduce((s, p) => s + p.amount, 0);
-    const balance = totalBilled - totalPaid;
-    const settledAt = new Date().toISOString();
+    const totalPaid   = unsettledPayments.reduce((s, p) => s + p.amount, 0);
+    const balance     = totalBilled - totalPaid;
+    const settledAt   = new Date().toISOString();
 
     const settlementResult = await db.runAsync(
       `INSERT INTO asset_customer_settlements
        (user_id, customer_id, total_billed, total_paid, balance, job_count, notes, settled_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [userId, customerId, totalBilled, totalPaid, balance, unsettledJobs.length, notes || null, settledAt]
+      [
+        userId, customerId, totalBilled, totalPaid,
+        balance, unsettledJobs.length, notes || null, settledAt,
+      ]
     );
     const settlementId = settlementResult.lastInsertRowId;
 
@@ -1425,7 +1535,8 @@ export async function settleAssetCustomer(
 
     await db.runAsync(
       `UPDATE time_logs SET is_settled = 1
-       WHERE user_id = ? AND customer_id = ? AND status = 'completed' AND is_settled = 0`,
+       WHERE user_id = ? AND customer_id = ?
+       AND status = 'completed' AND is_settled = 0`,
       [userId, customerId]
     );
     await db.runAsync(
@@ -1482,7 +1593,9 @@ export async function undoAssetCustomerSettlement(
       );
     }
 
-    const settlement = await db.getFirstAsync<{ customer_id: number; settled_at: string }>(
+    const settlement = await db.getFirstAsync<{
+      customer_id: number; settled_at: string;
+    }>(
       'SELECT customer_id, settled_at FROM asset_customer_settlements WHERE id = ? AND user_id = ?',
       [settlementId, userId]
     );

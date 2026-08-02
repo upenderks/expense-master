@@ -4,7 +4,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { Alert } from 'react-native';
 import { getDatabase, resetDatabaseInstance } from './database';
 
-const DB_NAME = 'expense_tracker.db';
+const DB_NAME = 'digidiary.db';
 const DB_PATH = `${FileSystem.documentDirectory}SQLite/${DB_NAME}`;
 
 export async function exportBackup(): Promise<boolean> {

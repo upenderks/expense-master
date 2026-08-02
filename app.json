@@ -7,21 +7,24 @@
     "icon": "./assets/icon.png",
     "scheme": "digi-diary",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#2563eb"
-    },
+    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.digidiary.app"
+      "bundleIdentifier": "com.digidiary.app",
+      "icon": "./assets/icon.png"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundColor": "#2563eb"
+        "monochromeImage": "./assets/android-icon-foreground.png",
+        "backgroundColor": "#4A00E0"
       },
-      "package": "com.digidiary.app"
+      "package": "com.digidiary.app",
+      "versionCode": 1,
+      "edgeToEdgeLayoutEnabled": true,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -34,12 +37,34 @@
       "expo-secure-store",
       "@react-native-community/datetimepicker",
       [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#4A00E0",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "dark": {
+            "backgroundColor": "#1a0040",
+            "image": "./assets/splash-icon.png"
+          }
+        }
+      ],
+      [
         "expo-image-picker",
         {
-          "photosPermission": "Allow DigiDiary to access photos for receipt capture",
-          "cameraPermission": "Allow DigiDiary to access camera for receipt capture"
+          "photosPermission": "Allow DigiDiary to access photos for diary entries",
+          "cameraPermission": "Allow DigiDiary to access camera for diary entries"
         }
       ]
-    ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "47ad7223-6d8a-4b8c-b92a-2fc75bfacfa7"
+      }
+    }
   }
 }
