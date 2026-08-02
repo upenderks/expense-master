@@ -10,6 +10,8 @@ import {
   Alert,
   Image,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
@@ -42,10 +44,29 @@ import { StatPill } from '../../src/components/StatPill';
 
 type Tab = 'expenses' | 'categories';
 
+// Default colors for backward compatibility / initial state
 const COLORS = [
   '#ef4444', '#f59e0b', '#10b981',
   '#3b82f6', '#8b5cf6', '#ec4899', '#6b7280',
 ];
+
+// ── Dynamic Color Palette Generator ───────────────────────────────────────
+function hslToHex(h: number, s: number, l: number): string {
+  l /= 100;
+  const a = (s * Math.min(l, 1 - l)) / 100;
+  const f = (n: number) => {
+    const k = (n + h / 30) % 12;
+    const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(255 * color)
+      .toString(16)
+      .padStart(2, '0');
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
+
+const HUES = [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330];
+const LIGHTS = [35, 50, 65, 80];
+const COLOR_PALETTE = HUES.flatMap((h) => LIGHTS.map((l) => hslToHex(h, 70, l)));
 
 function normalizeDate(date: string) {
   if (!date) return '';
@@ -325,7 +346,7 @@ export default function Expenses() {
     }
   };
 
-  // ── Filter ─────────────────────────────────────────────────────────────
+  // ── Helpers ─────────────────────────────────────────────────────────────
 
   const formatCurrency = (amount: number) =>
     '₹' + Number(amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
@@ -345,6 +366,13 @@ export default function Expenses() {
   const totalExpenses = filteredExpenses.reduce(
     (sum, expense) => sum + Number(expense.amount || 0), 0
   );
+
+  // ── Highest expense calculation ─────────────────────────────────────────
+  const highestAmount = filteredExpenses.length > 0
+    ? Math.max(...filteredExpenses.map((e) => Number(e.amount || 0)))
+    : 0;
+
+  const shouldHighlight = filteredExpenses.length >= 2 && highestAmount > 0;
 
   // ── Render ──────────────────────────────────────────────────────────────
 
@@ -368,11 +396,11 @@ export default function Expenses() {
             label={t('categories')}
             value={String(categories.length)}
           />
-          {/* {(startDate || endDate || filterCategory !== '') && (
+          {/* {shouldHighlight && (
             <StatPill
-              emoji="🔍"
-              label={t('filter')}
-              value="Active"
+              emoji="🔥"
+              label={t('highest')}
+              value={formatShort(highestAmount)}
             />
           )} */}
         </View>
@@ -419,6 +447,7 @@ export default function Expenses() {
         </TouchableOpacity>
       </View>
 
+      {/* ── Main scroll ───────────────────────────────────────────── */}
       <ScrollView
         refreshControl={
           <RefreshControl
@@ -430,7 +459,12 @@ export default function Expenses() {
       >
         {activeTab === 'expenses' ? (
           <>
-            {/* Date filter */}
+            <Button
+              title={`+ ${t('add_expense')}`}
+              onPress={() => openExpenseModal()}
+              style={styles.addBtnTop}
+            />
+
             <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
               <DateRangeFilter
                 startDate={startDate}
@@ -440,7 +474,6 @@ export default function Expenses() {
               />
             </View>
 
-            {/* Category filter */}
             <View style={{ paddingHorizontal: 16 }}>
               <Select
                 label={t('filter_by_category')}
@@ -454,7 +487,6 @@ export default function Expenses() {
               />
             </View>
 
-            {/* Total + Report */}
             <Card style={[
               styles.totalCard,
               { backgroundColor: isDark ? theme.colors.dangerSoft : '#fef2f2' },
@@ -468,7 +500,7 @@ export default function Expenses() {
                 {formatCurrency(totalExpenses)}
               </Text>
 
-              {pdfReportEnabled && (
+              {pdfReportEnabled && totalExpenses > 0 && (
                 <TouchableOpacity
                   style={[
                     styles.reportButton,
@@ -493,7 +525,6 @@ export default function Expenses() {
               )}
             </Card>
 
-            {/* Expense list */}
             {filteredExpenses.length === 0 ? (
               <Card>
                 <EmptyState
@@ -501,72 +532,104 @@ export default function Expenses() {
                   title={t('no_expenses_found')}
                   subtitle={t('app_tagline')}
                   actionHint={`+ ${t('add_expense')}`}
+                  onAction={() => openExpenseModal()}
                 />
               </Card>
             ) : (
-              filteredExpenses.map((e) => (
-                <Card key={e.id} style={styles.itemCard}>
-                  <View style={styles.expenseRow}>
-                    {receiptPhotoEnabled && e.photo_uri ? (
-                      <TouchableOpacity
-                        onPress={() => handleViewExpensePhoto(e.photo_uri)}
-                        activeOpacity={0.8}
+              filteredExpenses.map((e) => {
+                const isHighest = shouldHighlight && Number(e.amount) === highestAmount;
+
+                return (
+                  <Card
+                    key={e.id}
+                    style={[
+                      styles.itemCard,
+                      isHighest && styles.highestCard,
+                      isHighest && {
+                        borderColor: isDark ? '#f59e0b' : '#f89797',
+                        backgroundColor: isDark ? '#451a0310' : '#fef2f208',
+                      },
+                    ]}
+                  >
+                    {isHighest && (
+                      <View
+                        style={[
+                          styles.highestBadge,
+                          { backgroundColor: isDark ? '#f59e0b' : '#ef4444' },
+                        ]}
                       >
-                        <Image source={{ uri: e.photo_uri }} style={styles.thumbnail} />
-                        <View style={[styles.thumbnailBadge, { backgroundColor: theme.colors.surface }]}>
-                          <Text style={styles.thumbnailBadgeText}>📷</Text>
-                        </View>
-                      </TouchableOpacity>
-                    ) : (
-                      <View style={[
-                        styles.colorDot,
-                        { backgroundColor: e.category_color || e.color || '#6b7280' },
-                      ]} />
+                        <Text style={styles.highestBadgeText}>🔥 {t('highest_expense')}</Text>
+                      </View>
                     )}
 
-                    <View style={{ flex: 1, marginLeft: e.photo_uri ? 12 : 0 }}>
-                      <Text style={[styles.expenseCategory, { color: theme.colors.text }]}>
-                        {e.category_name}
-                      </Text>
-                      <Text style={[styles.expenseDate, { color: theme.colors.muted }]}>
-                        📅 {e.date}
-                      </Text>
-                      {e.description ? (
-                        <Text style={[styles.expenseDesc, { color: theme.colors.muted }]}>
-                          {e.description}
-                        </Text>
-                      ) : null}
-                    </View>
-
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={[styles.expenseAmount, { color: theme.colors.danger }]}>
-                        -{formatCurrency(e.amount)}
-                      </Text>
-                      <View style={styles.actionButtons}>
+                    <View style={styles.expenseRow}>
+                      {receiptPhotoEnabled && e.photo_uri ? (
                         <TouchableOpacity
-                          onPress={() => openExpenseModal(e)}
-                          style={[styles.editBtn, { backgroundColor: isDark ? '#1e3a5f' : '#dbeafe' }]}
+                          onPress={() => handleViewExpensePhoto(e.photo_uri)}
+                          activeOpacity={0.8}
                         >
-                          <Text style={styles.editBtnText}>✏️</Text>
+                          <Image source={{ uri: e.photo_uri }} style={styles.thumbnail} />
+                          <View style={[styles.thumbnailBadge, { backgroundColor: theme.colors.surface }]}>
+                            <Text style={styles.thumbnailBadgeText}>📷</Text>
+                          </View>
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={() => handleDeleteExpense(e.id, e.photo_uri)}>
-                          <Text style={styles.deleteBtn}>🗑️</Text>
-                        </TouchableOpacity>
+                      ) : (
+                        <View style={[
+                          styles.colorDot,
+                          { backgroundColor: e.category_color || e.color || '#6b7280' },
+                        ]} />
+                      )}
+
+                      <View style={{ flex: 1, marginLeft: e.photo_uri ? 12 : 0 }}>
+                        <Text style={[styles.expenseCategory, { color: theme.colors.text }]}>
+                          {e.category_name}
+                        </Text>
+                        <Text style={[styles.expenseDate, { color: theme.colors.muted }]}>
+                          📅 {e.date}
+                        </Text>
+                        {e.description ? (
+                          <Text style={[styles.expenseDesc, { color: theme.colors.muted }]}>
+                            {e.description}
+                          </Text>
+                        ) : null}
+                      </View>
+
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text
+                          style={[
+                            styles.expenseAmount,
+                            { color: theme.colors.danger },
+                            isHighest && styles.highestAmount,
+                          ]}
+                        >
+                          -{formatCurrency(e.amount)}
+                        </Text>
+                        <View style={styles.actionButtons}>
+                          <TouchableOpacity
+                            onPress={() => openExpenseModal(e)}
+                            style={[styles.editBtn, { backgroundColor: isDark ? '#1e3a5f' : '#dbeafe' }]}
+                          >
+                            <Text style={styles.editBtnText}>✏️</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={() => handleDeleteExpense(e.id, e.photo_uri)}>
+                            <Text style={styles.deleteBtn}>🗑️</Text>
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     </View>
-                  </View>
-                </Card>
-              ))
+                  </Card>
+                );
+              })
             )}
-
-            <Button
-              title={`+ ${t('add_expense')}`}
-              onPress={() => openExpenseModal()}
-              style={styles.addBtn}
-            />
           </>
         ) : (
           <>
+            <Button
+              title={`+ ${t('add_category')}`}
+              onPress={() => openCategoryModal()}
+              style={styles.addBtnTop}
+            />
+
             {categories.length === 0 ? (
               <Card>
                 <EmptyState
@@ -596,11 +659,6 @@ export default function Expenses() {
                 </Card>
               ))
             )}
-            <Button
-              title={`+ ${t('add_category')}`}
-              onPress={() => openCategoryModal()}
-              style={styles.addBtn}
-            />
           </>
         )}
 
@@ -608,13 +666,32 @@ export default function Expenses() {
       </ScrollView>
 
       {/* ── Expense Modal ──────────────────────────────────────────────── */}
-      <Modal visible={expenseModal} animationType="slide" transparent>
-        <View style={[styles.modalOverlay, { backgroundColor: theme.colors.overlay }]}>
-          <ScrollView
-            style={[styles.modalScrollContent, { backgroundColor: theme.colors.modalBg }]}
-            bounces={false}
-          >
-            <View style={styles.modalInner}>
+      <Modal
+        visible={expenseModal}
+        animationType="slide"
+        transparent
+        statusBarTranslucent
+      >
+        <KeyboardAvoidingView
+          style={[styles.modalOverlay, { backgroundColor: theme.colors.overlay }]}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 25}
+        >
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setExpenseModal(false)}
+          />
+
+          <View style={[styles.modalSheet, { backgroundColor: theme.colors.modalBg }]}>
+            <View style={styles.dragHandle} />
+
+            <ScrollView
+              bounces={false}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.modalInner}
+            >
               <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
                 {editingExpense ? t('edit_expense') : t('add_expense')}
               </Text>
@@ -659,55 +736,133 @@ export default function Expenses() {
               )}
 
               <View style={styles.modalButtons}>
-                <Button title={t('cancel')} variant="secondary" onPress={() => setExpenseModal(false)} />
-                <Button title={t('save')} onPress={handleSaveExpense} loading={saving} />
+                <Button
+                  title={t('cancel')}
+                  variant="secondary"
+                  onPress={() => setExpenseModal(false)}
+                />
+                <Button
+                  title={t('save')}
+                  onPress={handleSaveExpense}
+                  loading={saving}
+                />
               </View>
-            </View>
-          </ScrollView>
-        </View>
+
+              <View style={styles.modalBottomSpacer} />
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ── Category Modal ─────────────────────────────────────────────── */}
-      <Modal visible={categoryModal} animationType="slide" transparent>
-        <View style={[styles.modalOverlay, { backgroundColor: theme.colors.overlay }]}>
-          <View style={[styles.modalContent, { backgroundColor: theme.colors.modalBg }]}>
-            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
-              {editingCategory ? t('edit_category') : t('add_category')}
-            </Text>
+      <Modal
+        visible={categoryModal}
+        animationType="slide"
+        transparent
+        statusBarTranslucent
+      >
+        <KeyboardAvoidingView
+          style={[styles.modalOverlay, { backgroundColor: theme.colors.overlay }]}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 25}
+        >
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setCategoryModal(false)}
+          />
 
-            <Input
-              label={`${t('name')} *`}
-              value={categoryForm.name}
-              onChangeText={(v) => setCategoryForm({ ...categoryForm, name: v })}
-              placeholder={t('category_name')}
-            />
+          <View style={[styles.modalSheet, { backgroundColor: theme.colors.modalBg }]}>
+            <View style={styles.dragHandle} />
 
-            <Text style={[styles.colorLabel, { color: theme.colors.textSecondary }]}>
-              {t('color')}
-            </Text>
-            <View style={styles.colorPicker}>
-              {COLORS.map((c) => (
-                <TouchableOpacity
-                  key={c}
-                  style={[
-                    styles.colorOption,
-                    { backgroundColor: c },
-                    categoryForm.color === c && [
-                      styles.colorOptionActive,
-                      { borderColor: isDark ? '#fff' : '#111827' },
-                    ],
-                  ]}
-                  onPress={() => setCategoryForm({ ...categoryForm, color: c })}
+            <ScrollView
+              bounces={false}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.modalInner}
+            >
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+                {editingCategory ? t('edit_category') : t('add_category')}
+              </Text>
+
+              <Input
+                label={`${t('name')} *`}
+                value={categoryForm.name}
+                onChangeText={(v) => setCategoryForm({ ...categoryForm, name: v })}
+                placeholder={t('category_name')}
+              />
+
+              {/* ── Dynamic Color Picker Section ── */}
+              <Text style={[styles.colorLabel, { color: theme.colors.textSecondary }]}>
+                {t('color')}
+              </Text>
+              
+              <View style={styles.dynamicColorContainer}>
+                {/* Hex Input + Preview */}
+                <View style={styles.colorPreviewRow}>
+                  <View style={[styles.colorPreview, { backgroundColor: categoryForm.color || '#6b7280' }]} />
+                  <View style={{ flex: 1 }}>
+                    <Input
+                      label="Hex Color"
+                      value={categoryForm.color}
+                      onChangeText={(v) => {
+                        // Automatically prepend '#' if user types without it
+                        let hex = v;
+                        if (!hex.startsWith('#') && hex.length > 0) {
+                          hex = `#${hex}`;
+                        }
+                        setCategoryForm({ ...categoryForm, color: hex });
+                      }}
+                      placeholder="#RRGGBB"
+                      autoCapitalize="characters"
+                    />
+                  </View>
+                </View>
+
+                {/* Palette Grid */}
+                <Text style={[styles.paletteLabel, { color: theme.colors.muted }]}>
+                  Or pick from palette
+                </Text>
+                <View style={styles.colorGrid}>
+                  {COLOR_PALETTE.map((c) => {
+                    const isSelected = categoryForm.color?.toLowerCase() === c.toLowerCase();
+                    return (
+                      <TouchableOpacity
+                        key={c}
+                        style={[
+                          styles.colorGridItem,
+                          { backgroundColor: c },
+                          isSelected && [
+                            styles.colorGridItemActive,
+                            { borderColor: isDark ? '#fff' : '#111827' },
+                          ],
+                        ]}
+                        onPress={() => setCategoryForm({ ...categoryForm, color: c })}
+                      >
+                        {isSelected && <Text style={styles.colorGridCheck}>✓</Text>}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <View style={styles.modalButtons}>
+                <Button
+                  title={t('cancel')}
+                  variant="secondary"
+                  onPress={() => setCategoryModal(false)}
                 />
-              ))}
-            </View>
+                <Button
+                  title={t('save')}
+                  onPress={handleSaveCategory}
+                  loading={saving}
+                />
+              </View>
 
-            <View style={styles.modalButtons}>
-              <Button title={t('cancel')} variant="secondary" onPress={() => setCategoryModal(false)} />
-              <Button title={t('save')} onPress={handleSaveCategory} loading={saving} />
-            </View>
+              <View style={styles.modalBottomSpacer} />
+            </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ── Photo Viewer ───────────────────────────────────────────────── */}
@@ -730,7 +885,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
 
-  // Tabs - now below header, no top margin
+  // Tabs
   tabs: {
     flexDirection: 'row',
     marginHorizontal: 16,
@@ -759,8 +914,19 @@ const styles = StyleSheet.create({
   totalValue: { fontSize: 28, fontWeight: 'bold', marginTop: 4 },
 
   // Report button
-  reportButton: { marginTop: 14, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 10, alignSelf: 'stretch' },
-  reportButtonContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  reportButton: {
+    marginTop: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    alignSelf: 'stretch',
+  },
+  reportButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
   reportButtonIcon: { fontSize: 16 },
   reportButtonText: { color: '#fff', fontSize: 14, fontWeight: '600' },
 
@@ -772,11 +938,19 @@ const styles = StyleSheet.create({
   // Thumbnail
   thumbnail: { width: 56, height: 56, borderRadius: 8, backgroundColor: '#e2e8f0' },
   thumbnailBadge: {
-    position: 'absolute', bottom: -2, right: -2,
-    width: 20, height: 20, borderRadius: 10,
-    justifyContent: 'center', alignItems: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15, shadowRadius: 2, elevation: 2,
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
   },
   thumbnailBadgeText: { fontSize: 10 },
 
@@ -789,23 +963,123 @@ const styles = StyleSheet.create({
   editBtn: { padding: 6, borderRadius: 6 },
   editBtnText: { fontSize: 14 },
   deleteBtn: { fontSize: 18, padding: 4 },
-  addBtn: { marginHorizontal: 16, marginTop: 8 },
+
+  // Add button at top
+  addBtnTop: { marginHorizontal: 16, marginTop: 12, marginBottom: 8 },
 
   // Category row
   categoryRow: { flexDirection: 'row', alignItems: 'center' },
   categoryName: { flex: 1, fontSize: 16, fontWeight: '500' },
 
-  // Color picker
+  // ── Color Picker ─────────────────────────────────────────────────────
   colorLabel: { fontSize: 14, fontWeight: '500', marginBottom: 8 },
-  colorPicker: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 16 },
-  colorOption: { width: 40, height: 40, borderRadius: 20 },
-  colorOptionActive: { borderWidth: 3 },
+  dynamicColorContainer: {
+    marginBottom: 16,
+  },
+  colorPreviewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  colorPreview: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.1)',
+  },
+  paletteLabel: {
+    fontSize: 12,
+    marginBottom: 8,
+  },
+  colorGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  colorGridItem: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  colorGridItemActive: {
+    borderWidth: 3,
+  },
+  colorGridCheck: {
+    color: '#fff',
+    fontWeight: '900',
+    fontSize: 14,
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
 
-  // Modal
-  modalOverlay: { flex: 1, justifyContent: 'flex-end' },
-  modalContent: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '90%' },
-  modalScrollContent: { borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '92%' },
-  modalInner: { padding: 20, paddingBottom: 40 },
+  // ── Highest expense highlight ────────────────────────────────────────
+  highestCard: {
+    borderWidth: 2,
+    borderRadius: 12,
+    overflow: 'visible',
+  },
+  highestBadge: {
+    position: 'absolute',
+    top: -10,
+    right: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 10,
+    zIndex: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  highestBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  highestAmount: {
+    fontSize: 20,
+    fontWeight: '900',
+  },
+
+  // ── Modal ────────────────────────────────────────────────────────────
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    flex: 1,
+  },
+  modalSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '92%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 16,
+  },
+  dragHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#cbd5e1',
+    alignSelf: 'center',
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  modalInner: {
+    padding: 20,
+  },
+  modalBottomSpacer: { height: 24 },
   modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 16 },
   modalButtons: { flexDirection: 'row', gap: 12, marginTop: 16 },
+  
 });

@@ -322,6 +322,7 @@ export default function Money() {
                   title={t('no_borrowers_add')}
                   subtitle={t('app_tagline')}
                   actionHint={`+ ${t('add_borrower')}`}
+                  onAction={() => openBorrowerModal()}
                 />
               </Card>
             ) : (
@@ -433,6 +434,7 @@ export default function Money() {
                     ? t('no_transactions_date')
                     : t('no_transactions_yet')}
                   actionHint={`+ ${t('add_transaction')}`}
+                  onAction={() => openTransactionModal()}
                 />
               </Card>
             ) : (

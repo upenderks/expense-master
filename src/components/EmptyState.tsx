@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 
 interface EmptyStateProps {
@@ -7,6 +7,7 @@ interface EmptyStateProps {
   title: string;
   subtitle?: string;
   actionHint?: string;
+  onAction?: () => void;
 }
 
 export function EmptyState({
@@ -14,6 +15,7 @@ export function EmptyState({
   title,
   subtitle,
   actionHint,
+  onAction,
 }: EmptyStateProps) {
   const { theme, isDark } = useTheme();
 
@@ -34,14 +36,30 @@ export function EmptyState({
         </Text>
       )}
       {actionHint && (
-        <View style={[
-          styles.hintBadge,
-          { backgroundColor: isDark ? '#1e3a5f' : '#eff6ff' },
-        ]}>
-          <Text style={[styles.hintText, { color: theme.colors.primary }]}>
-            {actionHint}
-          </Text>
-        </View>
+        onAction ? (
+          <TouchableOpacity
+            onPress={onAction}
+            activeOpacity={0.7}
+            style={[
+              styles.hintBadge,
+              styles.hintBadgeTappable,
+              { backgroundColor: isDark ? '#1e3a5f' : '#eff6ff' },
+            ]}
+          >
+            <Text style={[styles.hintText, { color: theme.colors.primary }]}>
+              {actionHint}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={[
+            styles.hintBadge,
+            { backgroundColor: isDark ? '#1e3a5f' : '#eff6ff' },
+          ]}>
+            <Text style={[styles.hintText, { color: theme.colors.primary }]}>
+              {actionHint}
+            </Text>
+          </View>
+        )
       )}
     </View>
   );
@@ -81,6 +99,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
+  },
+  hintBadgeTappable: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   hintText: {
     fontSize: 13,

@@ -535,7 +535,8 @@ const en = {
     habit_cat_exercise: '🏃 Exercise',
     habit_cat_reading: '📖 Reading',
     habit_cat_meditation: '🧘 Meditation',
-    habit_cat_custom: '🔔 Custom'
+    habit_cat_custom: '🔔 Custom',
+    highest_expense: 'Highest Expense'
   
 };
 
@@ -1074,6 +1075,7 @@ const hi: typeof en = {
     habit_cat_reading: '📖 पढ़ाई',
     habit_cat_meditation: '🧘 ध्यान',
     habit_cat_custom: '🔔 कस्टम',
+    highest_expense: 'सबसे ज़्यादा खर्च'
 };
 
 export const translations: Record<Language, typeof en> = {

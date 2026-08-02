@@ -698,10 +698,13 @@ export default function More() {
           <Text style={[styles.aboutTagline, { color: theme.colors.muted }]}>
             {t('app_tagline')}
           </Text>
+          
 
           <View style={[styles.aboutDivider, { backgroundColor: theme.colors.border }]} />
-
-          <View style={styles.aboutFeatures}>
+          <Text style={[styles.aboutFooter, { color: theme.colors.muted }]}>
+                      Contact us : uksharma21@gmail.com
+          </Text>
+          {/* <View style={styles.aboutFeatures}>
             {[
               { emoji: '💰', label: t('tab_money') },
               { emoji: '💸', label: t('tab_expenses') },
@@ -717,7 +720,7 @@ export default function More() {
                 </Text>
               </View>
             ))}
-          </View>
+          </View> */}
 
           <View style={[styles.aboutDivider, { backgroundColor: theme.colors.border }]} />
 
@@ -754,10 +757,10 @@ export default function More() {
                 {t('filter_by_period')}
               </Text>
               {[
-                { value: 'all', label: `📅 ${t('all_time')}` },
                 { value: 'day', label: `📅 ${t('today')}` },
                 { value: 'week', label: `📅 ${t('this_week')}` },
                 { value: 'month', label: `📅 ${t('this_month')}` },
+                { value: 'all', label: `📅 ${t('all_time')}` },
               ].map((opt) => (
                 <TouchableOpacity
                   key={opt.value}
